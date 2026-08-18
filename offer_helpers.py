@@ -84,33 +84,28 @@ def save_shops_data(df):
         return False
 
 
-# 🟢 3. โหลดข้อมูลครู (ใช้วิธีเดิมหรือแปลงเป็น gspread ก็ได้)
+# 🟢 3. โหลดข้อมูลครู (ปรับมาใช้ gspread เพื่อแก้ปัญหา 401 Unauthorized)
 def load_teacher_data(sheet_name="Teachers"):
-    """อ่านข้อมูลครู"""
+    """อ่านข้อมูลครูผ่าน gspread Service Account"""
     person_dict = {}
     person_options = [""]
     try:
-        url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
-        df = pd.read_csv(url, dtype=str)
-        for _, row in df.iterrows():
-            r_list = row.tolist()
-            if len(r_list) >= 3:
-                fname = (
-                    str(r_list[1]).strip() if pd.notna(r_list[1]) else ""
-                )
-                lname = (
-                    str(r_list[2]).strip() if pd.notna(r_list[2]) else ""
-                )
-                acad = (
-                    str(r_list[3]).strip()
-                    if len(r_list) >= 4 and pd.notna(r_list[3])
-                    else ""
-                )
-                if fname and lname and lname not in ["nan", "None"]:
-                    full_name = f"{fname} {lname}".strip()
-                    if full_name not in person_dict:
-                        person_options.append(full_name)
-                        person_dict[full_name] = acad
+        ws = get_gsheet_worksheet(sheet_name)
+        data = ws.get_all_values()
+
+        if len(data) > 1:
+            # ข้าม Header (บรรทัดแรก)
+            for row in data[1:]:
+                if len(row) >= 3:
+                    fname = str(row[1]).strip() if row[1] else ""
+                    lname = str(row[2]).strip() if row[2] else ""
+                    acad = str(row[3]).strip() if len(row) >= 4 and row[3] else ""
+
+                    if fname and lname and lname.lower() not in ["nan", "none"]:
+                        full_name = f"{fname} {lname}".strip()
+                        if full_name not in person_dict:
+                            person_options.append(full_name)
+                            person_dict[full_name] = acad
     except Exception as e:
         st.warning(f"Error loading teachers: {e}")
     return person_options, person_dict
