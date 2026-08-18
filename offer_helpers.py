@@ -83,52 +83,39 @@ def save_shops_data(df):
         st.error(f"Error saving shops to Google Sheets: {e}")
         return False
 
-
-# 🟢 3. โหลดข้อมูลครู (ปรับมาใช้ gspread เพื่อแก้ปัญหา 401 Unauthorized)
-# 🟢 3. โหลดข้อมูลครู (ปรับปรุงระบบค้นหาคอลัมน์อัตโนมัติ)
+# 🟢 3. โหลดข้อมูลครู (ปรับตามโครงสร้าง Google Sheets จริง)
 def load_teacher_data(sheet_name="Teachers"):
-    """อ่านข้อมูลครูผ่าน gspread Service Account"""
+    """อ่านข้อมูลครูโดยอิงจากตำแหน่งคอลัมน์ B=ชื่อ, C=นามสกุล, D=วิทยฐานะ"""
     person_dict = {}
     person_options = [""]
     try:
         ws = get_gsheet_worksheet(sheet_name)
-        records = ws.get_all_records()
-        
-        for row in records:
-            # ค้นหาค่าชื่อ นามสกุล และตำแหน่ง ไม่ว่าจะใช้ชื่อคอลัมน์แบบไหน
-            fname = ""
-            lname = ""
-            acad = ""
-            
-            for k, v in row.items():
-                key_clean = str(k).strip().lower()
-                val_clean = str(v).strip() if pd.notna(v) and str(v).strip().lower() not in ["nan", "none"] else ""
-                
-                if "ชื่อ" in key_clean or "fname" in key_clean or "first" in key_clean:
-                    if "นามสกุล" not in key_clean and "lname" not in key_clean:
-                        fname = val_clean
-                elif "นามสกุล" in key_clean or "lname" in key_clean or "last" in key_clean:
-                    lname = val_clean
-                elif "ตำแหน่ง" in key_clean or "วิทยฐานะ" in key_clean or "acad" in key_clean or "position" in key_clean:
-                    acad = val_clean
-            
-            # ถ้าหาตามชื่อคอลัมน์ไม่เจอ ให้ใช้วิธีดึงตามลำดับค่าในแถว
-            if not fname and not lname:
-                vals = [str(val).strip() for val in row.values() if pd.notna(val) and str(val).strip() != ""]
-                if len(vals) >= 2:
-                    fname = vals[0]
-                    lname = vals[1]
-                    acad = vals[2] if len(vals) >= 3 else ""
+        rows = ws.get_all_values()
 
-            if fname and lname:
-                full_name = f"{fname} {lname}".strip()
-                if full_name not in person_dict:
-                    person_options.append(full_name)
-                    person_dict[full_name] = acad
+        # วนลูปอ่านข้อมูลตั้งแต่แถวที่ 2 เป็นต้นไป
+        for r in rows[1:]:
+            # ตรวจสอบว่าแถวนั้นมีคอลัมน์ B, C, D หรือไม่
+            if len(r) >= 3:
+                fname = str(r[1]).strip() if r[1] else ""  # คอลัมน์ B
+                lname = str(r[2]).strip() if r[2] else ""  # คอลัมน์ C
+                acad = (
+                    str(r[3]).strip() if len(r) >= 4 and r[3] else ""
+                )  # คอลัมน์ D
+
+                # กรองเอาเฉพาะแถวที่มีทั้งชื่อและนามสกุล (ข้ามพวกแถวหัวข้อหมวดหมู่)
+                if (
+                    fname
+                    and lname
+                    and fname not in ["ชื่อ - สกุล", "ฝ่ายบริหาร"]
+                ):
+                    full_name = f"{fname} {lname}".strip()
+                    if full_name not in person_dict:
+                        person_options.append(full_name)
+                        person_dict[full_name] = acad
 
     except Exception as e:
         st.warning(f"Error loading teachers: {e}")
-        
+
     return person_options, person_dict
 
 # 🟢 4. คำนวณวันทำการ
