@@ -18,28 +18,25 @@ def clean_text_val(val):
     return val_str
 
 def load_shops_data():
-    """อ่านข้อมูลร้านค้าผ่าน CSV Link พร้อมตัวช่วยเช็ก Error"""
+    """อ่านข้อมูลร้านค้าผ่าน CSV Link"""
     try:
-        # ลองเช็กชื่อ Tab ตรงนี้ให้แน่ใจว่าเป็นชื่อภาษาอังกฤษหรือไทยตามใน Google Sheet จริงๆ
-        url = get_sheet_url("Shops")  # หรือเปลี่ยนเป็นชื่อ Tab ของคุณ เช่น "ร้านค้า"
+        url = get_sheet_url("Shops")  # ถ้า Tab ใน Google Sheet ของคุณใช้ชื่ออื่น ให้เปลี่ยนตรงนี้ เช่น "ร้านค้า"
         df = pd.read_csv(url, dtype=str)
-        
-        # ปริ้นชั่วคราวบนหน้าเว็บเพื่อดูว่าดึงข้อมูลอะไรมาได้บ้าง (ถ้าขึ้นตารางแสดงว่าดึงได้แล้ว)
-        # st.write("ข้อมูลดิบที่ดึงมา:", df)
-
         for col in ["shop_name", "address", "phone", "tax_id"]:
             if col not in df.columns:
                 df[col] = ""
-
         df = df.dropna(subset=["shop_name"])
         for col in ["shop_name", "address", "phone", "tax_id"]:
             df[col] = df[col].apply(clean_text_val)
-
         return df
     except Exception as e:
-        # ถ้าพังตรงนี้ มันจะโชว์ Error สีแดงบอกชัดเจนว่าเพราะอะไร
-        st.error(f"⚠️ ดึงข้อมูลร้านค้าไม่ผ่าน: {e}")
+        st.error(f"Error loading shops: {e}")
         return pd.DataFrame(columns=["shop_name", "address", "phone", "tax_id"])
+
+def save_shops_data(df):
+    """กรณีอ่านผ่าน CSV จะบันทึกกลับไม่ได้โดยตรง"""
+    st.warning("⚠️ การบันทึกข้อมูลต้องทำผ่านหน้า Google Sheets โดยตรงครับ")
+    return False
 
 def load_teacher_data(sheet_name="Teachers"):
     """อ่านข้อมูลครูผ่าน CSV Link"""
