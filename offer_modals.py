@@ -31,34 +31,51 @@ def edit_address_modal_content(shop_name, c_address, c_phone, c_tax_id):
         if st.button("บันทึกการแก้ไข", type="primary", use_container_width=True):
             clean_phone_val = clean_text_val(new_phone)
             clean_tax_val = clean_text_val(new_tax_id)
+            target_shop = str(shop_name).strip()
 
-            df_shops = load_shops_data()
-            idx = df_shops[df_shops["shop_name"] == shop_name].index
+            with st.spinner("กำลังบันทึกลง Google Sheets..."):
+                df_shops = load_shops_data()
 
-            if not idx.empty:
-                df_shops.loc[idx[0], "address"] = new_address
-                df_shops.loc[idx[0], "phone"] = clean_phone_val
-                df_shops.loc[idx[0], "tax_id"] = clean_tax_val
-            else:
-                new_row = pd.DataFrame(
-                    [
-                        {
-                            "shop_name": shop_name,
-                            "address": new_address,
-                            "phone": clean_phone_val,
-                            "tax_id": clean_tax_val,
-                        }
-                    ]
-                )
-                df_shops = pd.concat([df_shops, new_row], ignore_index=True)
+                # Clean คอลัมน์ shop_name เพื่อให้เปรียบเทียบตรงกันชัวร์ๆ
+                if "shop_name" in df_shops.columns:
+                    df_shops["clean_shop_name"] = (
+                        df_shops["shop_name"].astype(str).str.strip()
+                    )
+                    idx = df_shops[
+                        df_shops["clean_shop_name"] == target_shop
+                    ].index
+                else:
+                    idx = pd.Index([])
 
-            if save_shops_data(df_shops):
-                cache_key = f"disp_vendor_{shop_name}"
-                if cache_key in st.session_state:
-                    del st.session_state[cache_key]
+                if not idx.empty:
+                    df_shops.loc[idx[0], "address"] = new_address
+                    df_shops.loc[idx[0], "phone"] = clean_phone_val
+                    df_shops.loc[idx[0], "tax_id"] = clean_tax_val
+                else:
+                    new_row = pd.DataFrame(
+                        [
+                            {
+                                "shop_name": target_shop,
+                                "address": new_address,
+                                "phone": clean_phone_val,
+                                "tax_id": clean_tax_val,
+                            }
+                        ]
+                    )
+                    df_shops = pd.concat(
+                        [df_shops, new_row], ignore_index=True
+                    )
 
-                st.toast(f"บันทึกข้อมูลของ '{shop_name}' เรียบร้อย!", icon="✅")
-                st.rerun()
+                # ลบคอลัมน์ชั่วคราวก่อนบันทึก
+                if "clean_shop_name" in df_shops.columns:
+                    df_shops = df_shops.drop(columns=["clean_shop_name"])
+
+                if save_shops_data(df_shops):
+                    st.cache_data.clear()  # ล้าง Cache บังคับโหลดใหม่
+                    st.toast(
+                        f"บันทึกข้อมูลของ '{target_shop}' เรียบร้อย!", icon="✅"
+                    )
+                    st.rerun()
 
     with col2:
         if st.button("ยกเลิก", use_container_width=True):
@@ -106,26 +123,36 @@ def add_shop_modal_content():
             if not clean_name:
                 st.error("⚠️ กรุณากรอกชื่อร้านค้า")
             else:
-                df_shops = load_shops_data()
+                with st.spinner("กำลังบันทึกลง Google Sheets..."):
+                    df_shops = load_shops_data()
+                    existing_shops = [
+                        str(s).strip() for s in df_shops["shop_name"].tolist()
+                    ]
 
-                if clean_name in df_shops["shop_name"].tolist():
-                    st.error(f"⚠️ ร้านค้า '{clean_name}' มีอยู่ในระบบแล้ว!")
-                else:
-                    new_row = pd.DataFrame(
-                        [
-                            {
-                                "shop_name": clean_name,
-                                "address": new_address,
-                                "phone": clean_phone_val,
-                                "tax_id": clean_tax_val,
-                            }
-                        ]
-                    )
-                    df_shops = pd.concat([df_shops, new_row], ignore_index=True)
+                    if clean_name in existing_shops:
+                        st.error(f"⚠️ ร้านค้า '{clean_name}' มีอยู่ในระบบแล้ว!")
+                    else:
+                        new_row = pd.DataFrame(
+                            [
+                                {
+                                    "shop_name": clean_name,
+                                    "address": new_address,
+                                    "phone": clean_phone_val,
+                                    "tax_id": clean_tax_val,
+                                }
+                            ]
+                        )
+                        df_shops = pd.concat(
+                            [df_shops, new_row], ignore_index=True
+                        )
 
-                    if save_shops_data(df_shops):
-                        st.toast(f"เพิ่มร้านค้า '{clean_name}' เรียบร้อย!", icon="✅")
-                        st.rerun()
+                        if save_shops_data(df_shops):
+                            st.cache_data.clear()  # ล้าง Cache บังคับโหลดใหม่
+                            st.toast(
+                                f"เพิ่มร้านค้า '{clean_name}' เรียบร้อย!",
+                                icon="✅",
+                            )
+                            st.rerun()
 
     with col2:
         if st.button("ยกเลิก", use_container_width=True):
