@@ -323,7 +323,7 @@ def render_purchase_page():
         if clean_num > 0 and clean_num_mid > clean_num:
             st.error("⚠️ **คำเตือน:** วงเงินราคากลางสูงกว่าวงเงินงบประมาณ!")
 
-    with col_report2:
+with col_report2:
         df_shops = load_shops_data()
         shop_list = [
             s
@@ -345,9 +345,17 @@ def render_purchase_page():
             match = df_shops[df_shops["shop_name"] == vendor_name]
             if not match.empty:
                 row = match.iloc[0]
-                c_address = str(row["address"]) if pd.notna(row["address"]) else ""
-                c_phone = str(row["phone"]) if pd.notna(row["phone"]) else ""
-                c_tax_id = str(row["tax_id"]) if pd.notna(row["tax_id"]) else ""
+                
+                # 📌 แก้ไขจุดนี้: ทำความสะอาดค่า "nan", "None" ให้กลายเป็นค่าว่างจริงๆ
+                def get_clean_val(val):
+                    if pd.isna(val) or val is None:
+                        return ""
+                    s_val = str(val).strip()
+                    return "" if s_val in ["nan", "None"] else s_val
+
+                c_address = get_clean_val(row.get("address"))
+                c_phone = get_clean_val(row.get("phone"))
+                c_tax_id = get_clean_val(row.get("tax_id"))
 
                 lines = []
                 if c_address:
