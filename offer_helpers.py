@@ -85,31 +85,51 @@ def save_shops_data(df):
 
 
 # 🟢 3. โหลดข้อมูลครู (ปรับมาใช้ gspread เพื่อแก้ปัญหา 401 Unauthorized)
+# 🟢 3. โหลดข้อมูลครู (ปรับปรุงระบบค้นหาคอลัมน์อัตโนมัติ)
 def load_teacher_data(sheet_name="Teachers"):
     """อ่านข้อมูลครูผ่าน gspread Service Account"""
     person_dict = {}
     person_options = [""]
     try:
         ws = get_gsheet_worksheet(sheet_name)
-        data = ws.get_all_values()
+        records = ws.get_all_records()
+        
+        for row in records:
+            # ค้นหาค่าชื่อ นามสกุล และตำแหน่ง ไม่ว่าจะใช้ชื่อคอลัมน์แบบไหน
+            fname = ""
+            lname = ""
+            acad = ""
+            
+            for k, v in row.items():
+                key_clean = str(k).strip().lower()
+                val_clean = str(v).strip() if pd.notna(v) and str(v).strip().lower() not in ["nan", "none"] else ""
+                
+                if "ชื่อ" in key_clean or "fname" in key_clean or "first" in key_clean:
+                    if "นามสกุล" not in key_clean and "lname" not in key_clean:
+                        fname = val_clean
+                elif "นามสกุล" in key_clean or "lname" in key_clean or "last" in key_clean:
+                    lname = val_clean
+                elif "ตำแหน่ง" in key_clean or "วิทยฐานะ" in key_clean or "acad" in key_clean or "position" in key_clean:
+                    acad = val_clean
+            
+            # ถ้าหาตามชื่อคอลัมน์ไม่เจอ ให้ใช้วิธีดึงตามลำดับค่าในแถว
+            if not fname and not lname:
+                vals = [str(val).strip() for val in row.values() if pd.notna(val) and str(val).strip() != ""]
+                if len(vals) >= 2:
+                    fname = vals[0]
+                    lname = vals[1]
+                    acad = vals[2] if len(vals) >= 3 else ""
 
-        if len(data) > 1:
-            # ข้าม Header (บรรทัดแรก)
-            for row in data[1:]:
-                if len(row) >= 3:
-                    fname = str(row[1]).strip() if row[1] else ""
-                    lname = str(row[2]).strip() if row[2] else ""
-                    acad = str(row[3]).strip() if len(row) >= 4 and row[3] else ""
+            if fname and lname:
+                full_name = f"{fname} {lname}".strip()
+                if full_name not in person_dict:
+                    person_options.append(full_name)
+                    person_dict[full_name] = acad
 
-                    if fname and lname and lname.lower() not in ["nan", "none"]:
-                        full_name = f"{fname} {lname}".strip()
-                        if full_name not in person_dict:
-                            person_options.append(full_name)
-                            person_dict[full_name] = acad
     except Exception as e:
         st.warning(f"Error loading teachers: {e}")
+        
     return person_options, person_dict
-
 
 # 🟢 4. คำนวณวันทำการ
 def add_business_days(start_date, num_days):
