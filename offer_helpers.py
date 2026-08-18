@@ -5,7 +5,7 @@ import pandas as pd
 import streamlit as st
 
 # 🔗 กำหนด Spreadsheet ID ของ Google Sheet
-SPREADSHEET_ID = "1hPP2Jks_k9-hKSWzgnVyIJMRWVmo32Qa"
+SPREADSHEET_ID = "1k_hSSdF50uYcRZVffPNh0NfpXvbJFjajlG26SRUpYMs"
 
 
 # 🟢 0. ฟังก์ชันเชื่อมต่อ Google Sheets ผ่าน Service Account
