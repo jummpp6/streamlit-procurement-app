@@ -1,0 +1,731 @@
+import datetime
+import io
+import os
+import zipfile
+import re
+
+import pandas as pd
+from pythainlp.util import bahttext
+import streamlit as st
+
+from doc_processor import (
+    format_budget_money,
+    format_thai_date,
+    process_docx,
+    to_thai_num,
+)
+from offer_components import render_person_inputs
+from offer_helpers import (
+    add_business_days,
+    load_shops_data,
+    load_teacher_data,
+)
+from offer_modals import add_shop_modal, dialog_decorator, edit_address_modal
+
+
+def reset_hiring_form():
+    """ฟังก์ชันสำหรับล้างข้อมูลในฟอร์มจัดจ้าง (เรียกใช้ผ่าน on_click)"""
+    keys_to_clear = [
+        "hiring_project_name",
+        "hiring_budget",
+        "hiring_item_count",
+        "hiring_dept",
+        "hiring_doc_no",
+        "hiring_doc_save",
+        "hiring_budget_mid",
+        "hiring_sub_grant",
+        "hiring_sub_budget",
+        "hiring_submit_no",
+    ]
+    for key in keys_to_clear:
+        if key in st.session_state:
+            st.session_state[key] = ""
+
+    # แจ้งเตือนเมื่อล้างข้อมูลสำเร็จ
+    st.toast("ล้างข้อมูลเรียบร้อยแล้ว!", icon="🧹")
+
+
+def render_hiring_page():
+    st.markdown(
+        """
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=TH+Sarabun+New:wght@400;600;700&display=swap');
+            @import url('https://fonts.cdnfonts.com/css/th-sarabunpsk');
+
+            header[data-testid="stHeader"] { display: none !important; }
+            .main .block-container { padding-top: 1rem !important; padding-bottom: 2.5rem !important; max-width: 1100px !important; }
+            html, body, [class*="css"], .stMarkdown, .stText, p, label, input, select, textarea, button, span, div { font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', sans-serif !important; font-size: 103.5% !important; }
+            div[data-testid="stHorizontalBlock"] { align-items: flex-start !important; gap: 1.5rem !important; }
+            .stTextInput label, .stSelectbox label, .stDateInput label, .stRadio label { font-weight: 600 !important; font-size: 105% !important; margin-bottom: 4px !important; color: #334155 !important; }
+            div[data-baseweb="select"] *, div[data-baseweb="input"] input { font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', sans-serif !important; font-size: 105% !important; }
+            div[data-testid="stDateInput"] input { font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', sans-serif !important; font-size: 105% !important; line-height: 44px !important; height: 44px !important; padding-top: 0px !important; padding-bottom: 0px !important; }
+            div[data-baseweb="input"] > div, div[data-baseweb="select"] > div { min-height: 44px !important; height: 44px !important; align-items: center !important; border-radius: 6px !important; background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; }
+            h1 { font-size: 3.5rem !important; font-weight: 700 !important; margin-top: 0rem !important; margin-bottom: 0.5rem !important; color: #0F172A !important; }
+            h3, .stSubheader { font-size: 2.6rem !important; font-weight: 700 !important; color: #0F172A !important; margin-top: 0.8rem !important; margin-bottom: 0.6rem !important; border-bottom: 2px solid #CBD5E1; padding-bottom: 4px; }
+            h5 { font-size: 1.8rem !important; font-weight: 600 !important; color: #1E293B !important; margin-top: 0.2rem !important; margin-bottom: 0.5rem !important; background-color: #F1F5F9; padding: 4px 10px; border-left: 4px solid #2563EB; border-radius: 0 4px 4px 0; }
+            .stButton > button { padding: 0.5rem 1.5rem !important; font-size: 100% !important; border-radius: 8px !important; font-weight: 600 !important; }
+            .stElementContainer { margin-bottom: 0.4rem !important; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.title("🛒 ระบบสร้างเอกสารจ้าง")  # หรือชื่อหน้าของ hiring.py
+
+    # --- แถวบนสุด: ปุ่มกลับหน้าหลัก + ช่องกรอกเลขพัสดุ ---
+    col_top1, col_top2 = st.columns([1, 2], gap="medium")
+    with col_top1:
+        if st.button("⬅️ กลับหน้าหลัก", use_container_width=True):
+            st.session_state.page = "home"
+            st.rerun()
+
+    with col_top2:
+            parcel_no = st.text_input(
+                "",
+                placeholder="ตัวอย่าง: เลขพัสดุ (เช่น 317-69 หรือ 111-69)",
+                key="purchase_parcel_no",
+                # ซ่อน Label เพื่อให้วางเรียงสวยงาม
+            )
+
+    TEMPLATE_DIR = "templates_hiring"
+    if not os.path.exists(TEMPLATE_DIR):
+        os.makedirs(TEMPLATE_DIR)
+
+    template_files = [
+        f
+        for f in os.listdir(TEMPLATE_DIR)
+        if f.endswith(".docx") and not f.startswith("~$")
+    ]
+
+    # --- ส่วนที่ 1: ข้อมูลการจัดจ้างหลัก ---
+    st.subheader("📝 1. ข้อมูลการจัดจ้าง (หน้า ส.1)")
+    col1, col2 = st.columns([1, 1], gap="large")
+
+    with col1:
+        project_name = st.text_input(
+            "ชื่อโครงการ",
+            placeholder="ตัวอย่าง: จ้างซ่อมแซมเครื่องปรับอากาศ",
+            key="hiring_project_name",
+        )
+        budget = st.text_input(
+            "วงเงินที่จะจ้าง (พิมพ์เฉพาะตัวเลข)",
+            placeholder="ตัวอย่าง: 15000",
+            key="hiring_budget",
+        )
+        clean_num = 0.0
+        try:
+            clean_num = float(
+                budget.replace(",", "").replace(" ", "").replace("บาท", "")
+            )
+            budget_text = bahttext(clean_num)
+        except ValueError:
+            budget_text = budget
+
+        st.info(f"💡 **แปลงเป็นตัวหนังสืออัตโนมัติ:** {budget_text}")
+
+        item_count_raw = st.text_input(
+            "จำนวนรายการ / งาน",
+            placeholder="ตัวอย่าง: 1 งาน หรือ 3 รายการ",
+            key="hiring_item_count",
+        )
+
+        budget_source_type = st.radio(
+            "แหล่งเงินงบประมาณ",
+            [
+                "บกศ. (เงินรายได้สถานศึกษา)",
+                "เงินอุดหนุน",
+                "งปม. (เงินงบประมาณ)",
+            ],
+            key="hiring_budget_source",
+        )
+
+        budget_type_text = ""
+        if budget_source_type == "บกศ. (เงินรายได้สถานศึกษา)":
+            budget_type_text = "เงินรายได้ของสถานศึกษา (บกศ.)"
+        elif budget_source_type == "เงินอุดหนุน":
+            sub_detail = st.text_input(
+                "ระบุรายละเอียดเงินอุดหนุน",
+                value="กิจกรรมพัฒนาผู้เรียน",
+                placeholder="ตัวอย่าง: ค่ากิจกรรมพัฒนาผู้เรียน",
+                key="hiring_sub_grant",
+            )
+            budget_type_text = f"เงินอุดหนุน {sub_detail}"
+        elif budget_source_type == "งปม. (เงินงบประมาณ)":
+            sub_detail = st.text_input(
+                "ระบุรายละเอียดเงินงบประมาณ",
+                value="เงินอุดหนุน",
+                placeholder="ตัวอย่าง: งบดำเนินงาน",
+                key="hiring_sub_budget",
+            )
+            budget_type_text = f"เงินงบประมาณ {sub_detail}"
+
+    with col2:
+        department = st.text_input(
+            "งาน หรือ แผนกวิชาที่จัดทำ",
+            placeholder="ตัวอย่าง: แผนกวิชาช่างยนต์",
+            key="hiring_dept",
+        )
+        selected_date = st.date_input(
+            "วันที่เอกสาร (หน้า ส.1)",
+            datetime.date.today(),
+            key="hiring_doc_date",
+        )
+        doc_no_raw = st.text_input(
+            "เลขที่คำสั่ง",
+            placeholder="ตัวอย่าง: 961/2569",
+            key="hiring_doc_no",
+        )
+        doc_no_save = st.text_input(
+            "เลขที่บันทึก",
+            placeholder="ตัวอย่าง: 961",
+            key="hiring_doc_save",
+        )
+
+    use_thai_num = True
+    use_thai_num2 = True
+
+    # --- ส่วนที่ 2: คณะกรรมการ ---
+    st.write("")
+    st.subheader("👥 2. คำสั่งคณะกรรมการ / ตรวจรับพัสดุ")
+    EXCEL_PATH = "teachers.xlsx"
+    person_options, person_dict = load_teacher_data(EXCEL_PATH)
+
+    col_count1, col_count2 = st.columns([1, 1], gap="large")
+    with col_count1:
+        buy_count = st.selectbox(
+            "จำนวนกรรมการจัดจ้าง / กำหนดขอบเขตงาน",
+            options=[1, 2, 3],
+            index=2,
+            key="hiring_buy_count_select",
+        )
+    with col_count2:
+        check_count = st.selectbox(
+            "จำนวนกรรมการตรวจรับ",
+            options=[1, 2, 3],
+            index=2,
+            key="hiring_check_count_select",
+        )
+
+    st.markdown("##### 🛠️ คณะกรรมการจัดจ้าง")
+    with st.container(border=True):
+        buy_name1, buy_acad1, buy_pos1 = render_person_inputs(
+            "จัดจ้าง 1",
+            "hiring_buy1",
+            "นายสมชาย ใจดี",
+            "",
+            "ประธานกรรมการฯ",
+            person_options,
+            person_dict,
+        )
+        if buy_count >= 2:
+            buy_name2, buy_acad2, buy_pos2 = render_person_inputs(
+                "จัดจ้าง 2",
+                "hiring_buy2",
+                "นางสาวสมหญิง ใจงาม",
+                "",
+                "กรรมการฯ",
+                person_options,
+                person_dict,
+            )
+        else:
+            buy_name2, buy_acad2, buy_pos2 = "", "", ""
+
+        if buy_count >= 3:
+            buy_name3, buy_acad3, buy_pos3 = render_person_inputs(
+                "จัดจ้าง 3",
+                "hiring_buy3",
+                "นายสมปอง ใจกล้า",
+                "",
+                "กรรมการฯ",
+                person_options,
+                person_dict,
+            )
+        else:
+            buy_name3, buy_acad3, buy_pos3 = "", "", ""
+
+    st.markdown("##### 🔍 คณะกรรมการตรวจรับ")
+    with st.container(border=True):
+        check_pos_options = (
+            ["ผู้ตรวจรับการจ้าง"]
+            if check_count == 1
+            else ["ประธานกรรมการฯ", "กรรมการฯ", "กรรมการและเลขานุการฯ"]
+        )
+
+        default_check_pos1 = (
+            "ผู้ตรวจรับการจ้าง" if check_count == 1 else "ประธานกรรมการฯ"
+        )
+
+        check_name1, check_acad1, check_pos1 = render_person_inputs(
+            "ตรวจรับ 1",
+            "hiring_check1",
+            "นายสมชาย ใจดี",
+            "",
+            default_check_pos1,
+            person_options,
+            person_dict,
+            pos_options_custom=check_pos_options,
+        )
+        if check_count >= 2:
+            check_name2, check_acad2, check_pos2 = render_person_inputs(
+                "ตรวจรับ 2",
+                "hiring_check2",
+                "นางสาวสมหญิง ใจงาม",
+                "",
+                "กรรมการฯ",
+                person_options,
+                person_dict,
+            )
+        else:
+            check_name2, check_acad2, check_pos2 = "", "", ""
+
+        if check_count >= 3:
+            check_name3, check_acad3, check_pos3 = render_person_inputs(
+                "ตรวจรับ 3",
+                "hiring_check3",
+                "นายสมปอง ใจกล้า",
+                "",
+                "กรรมการฯ",
+                person_options,
+                person_dict,
+            )
+        else:
+            check_name3, check_acad3, check_pos3 = "", "", ""
+
+    # --- ส่วนที่ 3: รายงานผลการพิจารณา ---
+    st.write("")
+    st.subheader("📋 3. รายงานผลการพิจารณา / เสนออนุมัติสั่งจ้าง")
+
+    col_report1, col_report2 = st.columns([1, 1], gap="large")
+
+    with col_report1:
+        selected_date2 = st.date_input(
+            "วันที่รายงานผล", datetime.date.today(), key="hiring_date_report"
+        )
+        budgetmid = st.text_input(
+            "วงเงินราคากลาง (พิมพ์เฉพาะตัวเลข)",
+            placeholder="ตัวอย่าง: 15000",
+            key="hiring_budget_mid",
+        )
+
+        clean_num_mid = 0.0
+        try:
+            clean_num_mid = float(
+                budgetmid.replace(",", "").replace(" ", "").replace("บาท", "")
+            )
+            budget_text_mid = bahttext(clean_num_mid)
+        except ValueError:
+            budget_text_mid = budgetmid
+
+        st.info(f"💡 **แปลงเป็นตัวหนังสืออัตโนมัติ:** {budget_text_mid}")
+
+        # แจ้งเตือนแบบเรียลไทม์หากราคากลางสูงกว่างบประมาณ
+        if clean_num > 0 and clean_num_mid > clean_num:
+            st.error("⚠️ **คำเตือน:** วงเงินราคากลางสูงกว่าวงเงินที่จะจ้าง!")
+
+    with col_report2:
+        df_shops = load_shops_data()
+        shop_list = [
+            s
+            for s in df_shops["shop_name"].tolist()
+            if s and str(s).strip() not in ["nan", "None", ""]
+        ]
+
+        vendor_name = st.selectbox(
+            "ผู้รับจ้าง / ชื่อบริษัท / ร้านค้า / ผู้รับเหมา",
+            options=shop_list,
+            index=0 if shop_list else None,
+            key="hiring_selected_vendor_name",
+        )
+
+        c_address, c_phone, c_tax_id = "", "", ""
+        display_text = "ไม่มีข้อมูล"
+
+        if vendor_name:
+            match = df_shops[df_shops["shop_name"] == vendor_name]
+            if not match.empty:
+                row = match.iloc[0]
+                c_address = str(row["address"]) if pd.notna(row["address"]) else ""
+                c_phone = str(row["phone"]) if pd.notna(row["phone"]) else ""
+                c_tax_id = str(row["tax_id"]) if pd.notna(row["tax_id"]) else ""
+
+                lines = []
+                if c_address:
+                    lines.append(c_address)
+                if c_phone:
+                    lines.append(f"เบอร์โทรศัพท์: {c_phone}")
+                if c_tax_id:
+                    lines.append(f"เลขประจำตัวผู้เสียภาษี: {c_tax_id}")
+
+                if lines:
+                    display_text = "\n".join(lines)
+
+        st.markdown("**รายละเอียดผู้รับจ้าง**")
+        st.text_area(
+            "รายละเอียดผู้รับจ้าง",
+            value=display_text,
+            disabled=True,
+            height=130,
+            label_visibility="collapsed",
+            key="hiring_vendor_display",
+        )
+
+        col_btn_add, col_btn_edit = st.columns([1, 1], gap="small")
+        with col_btn_add:
+            if st.button(
+                "➕ เพิ่มผู้รับจ้าง",
+                use_container_width=True,
+                key="hiring_btn_add_shop",
+            ):
+                if dialog_decorator:
+                    add_shop_modal()
+        with col_btn_edit:
+            if st.button(
+                "✏️ แก้ไขข้อมูลผู้รับจ้าง",
+                use_container_width=True,
+                key="hiring_btn_edit_shop",
+            ):
+                if dialog_decorator:
+                    edit_address_modal(vendor_name, c_address, c_phone, c_tax_id)
+
+    # --- ส่วนที่ 4: ใบสั่งจ้าง ---
+    st.write("")
+    st.write("")
+    st.subheader("📄 4. ใบสั่งจ้าง / ใบข้อตกลงจ้าง")
+    col1, col2 = st.columns([1, 1], gap="large")
+    with col1:
+        submit_no = st.text_input(
+            "เลขที่ข้อตกลง / สั่งจ้าง",
+            placeholder="ตัวอย่าง: 961/2569",
+            key="hiring_submit_no",
+        )
+
+    with col2:
+        default_order_date = add_business_days(selected_date2, 3)
+        selected_date5 = st.date_input(
+            "วันที่ใบสั่งจ้าง",
+            value=default_order_date,
+            key="hiring_date_order_input",
+        )
+
+    # --- ส่วนที่ 5: ใบตรวจรับ ---
+    st.write("")
+    st.subheader("✅ 5. ใบตรวจรับการจ้าง")
+    selected_date4 = st.date_input(
+        "วันที่ตรวจรับงานจ้าง",
+        datetime.date.today(),
+        key="hiring_check_date",
+    )
+
+    # --- ประมวลผลแปลงตัวเลข/วันที่ ---
+    formatted_budget = format_budget_money(budget, use_thai=use_thai_num)
+    formatted_budget_mid = format_budget_money(budgetmid, use_thai=use_thai_num2)
+
+    formatted_date = format_thai_date(selected_date, use_thai=use_thai_num)
+    formatted_date2 = format_thai_date(selected_date2, use_thai=use_thai_num)
+
+    calc_date3 = add_business_days(selected_date5, 3)
+    formatted_date3 = format_thai_date(calc_date3, use_thai=use_thai_num)
+
+    formatted_date4 = format_thai_date(selected_date4, use_thai=use_thai_num)
+    formatted_date5 = format_thai_date(selected_date5, use_thai=use_thai_num)
+
+    formatted_doc_no = to_thai_num(doc_no_raw) if use_thai_num else str(doc_no_raw)
+    formatted_doc_no_save = (
+        to_thai_num(doc_no_save) if use_thai_num else str(doc_no_save)
+    )
+    formatted_submit_no = to_thai_num(submit_no) if use_thai_num else str(submit_no)
+    formatted_item_count = (
+        to_thai_num(item_count_raw) if use_thai_num else str(item_count_raw)
+    )
+
+    budget_with_text = f"{formatted_budget} บาท ({budget_text})"
+    budget_with_text_mid = f"{formatted_budget_mid} บาท ({budget_text_mid})"
+
+    replacements_data = {
+        "{{PROJECT_NAME}}": project_name,
+        "{{BUDGET}}": formatted_budget,
+        "{{BUDGET_MID}}": formatted_budget_mid,
+        "{{BUDGET_TEXT}}": budget_text,
+        "{{BUDGET_TEXT_MID}}": budget_text_mid,
+        "{{BUDGET_WITH_TEXT}}": budget_with_text,
+        "{{BUDGET_WITH_TEXT_MID}}": budget_with_text_mid,
+        "{{BUDGET_TYPE}}": budget_type_text,
+        "{{ITEM_COUNT}}": formatted_item_count,
+        "{{DEPARTMENT}}": department,
+        "{{VENDOR_NAME}}": vendor_name,
+        "{{VENDOR_ADDRESS}}": to_thai_num(c_address),
+        "{{VENDOR_PHONE}}": to_thai_num(c_phone),
+        "{{VENDOR_TAX_ID}}": to_thai_num(c_tax_id),
+        "{{DOC_DATE}}": formatted_date,
+        "{{DOC_DATE2}}": formatted_date2,
+        "{{DOC_DATE3}}": formatted_date3,
+        "{{DOC_DATE4}}": formatted_date4,
+        "{{DOC_DATE5}}": formatted_date5,
+        "{{DOC_NO}}": formatted_doc_no,
+        "{{DOC_NO_SAVE}}": formatted_doc_no_save,
+        "{{SUBMIT_NO}}": formatted_submit_no,
+        "{{DIRECTOR_INSPECTOR}}": "คณะกรรมการ" if check_count > 1 else "ผู้",
+        "{{DIRECTOR_NAME_BUY}}": f"๑. {buy_name1}" if buy_name1 else "",
+        "{{DIRECTOR_ACAD_BUY}}": buy_acad1 if buy_name1 else "",
+        "{{DIRECTOR_POS_BUY}}": buy_pos1 if buy_name1 else "",
+        "{{DIRECTOR_NAME_BUY2}}": (
+            f"๒. {buy_name2}" if buy_name2 and buy_count >= 2 else ""
+        ),
+        "{{DIRECTOR_ACAD_BUY2}}": buy_acad2 if buy_name2 and buy_count >= 2 else "",
+        "{{DIRECTOR_POS_BUY2}}": buy_pos2 if buy_name2 and buy_count >= 2 else "",
+        "{{DIRECTOR_NAME_BUY3}}": (
+            f"๓. {buy_name3}" if buy_name3 and buy_count >= 3 else ""
+        ),
+        "{{DIRECTOR_ACAD_BUY3}}": buy_acad3 if buy_name3 and buy_count >= 3 else "",
+        "{{DIRECTOR_POS_BUY3}}": buy_pos3 if buy_name3 and buy_count >= 3 else "",
+        "{{DIRECTOR_NAME_BUY_PLAIN}}": buy_name1 if buy_name1 else "",
+        "{{DIRECTOR_NAME_BUY2_PLAIN}}": (
+            buy_name2 if buy_name2 and buy_count >= 2 else ""
+        ),
+        "{{DIRECTOR_NAME_BUY3_PLAIN}}": (
+            buy_name3 if buy_name3 and buy_count >= 3 else ""
+        ),
+        "{{SIGN_LINE_BUY1}}": (
+            "ลงชื่อ....................................ประธานกรรมการฯ"
+            if buy_name1
+            else ""
+        ),
+        "{{SIGN_NAME_BUY1}}": f"({buy_name1})" if buy_name1 else "",
+        "{{SIGN_LINE_BUY2}}": (
+            "ลงชื่อ....................................กรรมการฯ"
+            if buy_name2 and buy_count >= 2
+            else ""
+        ),
+        "{{SIGN_NAME_BUY2}}": (
+            f"({buy_name2})" if buy_name2 and buy_count >= 2 else ""
+        ),
+        "{{SIGN_LINE_BUY3}}": (
+            "ลงชื่อ....................................กรรมการฯ"
+            if buy_name3 and buy_count >= 3
+            else ""
+        ),
+        "{{SIGN_NAME_BUY3}}": (
+            f"({buy_name3})" if buy_name3 and buy_count >= 3 else ""
+        ),
+        "{{CHECKITEM_NAME}}": f"๑. {check_name1}" if check_name1 else "",
+        "{{CHECKITEM_ACAD}}": check_acad1 if check_name1 else "",
+        "{{CHECKITEM_POS}}": (
+            ("ผู้ตรวจรับการจ้าง" if check_count == 1 else check_pos1)
+            if check_name1
+            else ""
+        ),
+        "{{CHECKITEM_NAME2}}": (
+            f"๒. {check_name2}" if check_name2 and check_count >= 2 else ""
+        ),
+        "{{CHECKITEM_ACAD2}}": (
+            check_acad2 if check_name2 and check_count >= 2 else ""
+        ),
+        "{{CHECKITEM_POS2}}": check_pos2 if check_name2 and check_count >= 2 else "",
+        "{{CHECKITEM_NAME3}}": (
+            f"๓. {check_name3}" if check_name3 and check_count >= 3 else ""
+        ),
+        "{{CHECKITEM_ACAD3}}": (
+            check_acad3 if check_name3 and check_count >= 3 else ""
+        ),
+        "{{CHECKITEM_POS3}}": check_pos3 if check_name3 and check_count >= 3 else "",
+        "{{CHECKITEM_NAME_PLAIN}}": check_name1 if check_name1 else "",
+        "{{CHECKITEM_NAME2_PLAIN}}": (
+            check_name2 if check_name2 and check_count >= 2 else ""
+        ),
+        "{{CHECKITEM_NAME3_PLAIN}}": (
+            check_name3 if check_name3 and check_count >= 3 else ""
+        ),
+        "{{SIGN_LINE_CHECK1}}": (
+            "ลงชื่อ....................................ผู้ตรวจรับการจ้าง"
+            if (check_name1 and check_count == 1)
+            else (
+                "ลงชื่อ....................................ประธานกรรมการฯ"
+                if check_name1
+                else ""
+            )
+        ),
+        "{{SIGN_NAME_CHECK1}}": f"({check_name1})" if check_name1 else "",
+        "{{SIGN_LINE_CHECK2}}": (
+            "ลงชื่อ....................................กรรมการฯ"
+            if check_name2 and check_count >= 2
+            else ""
+        ),
+        "{{SIGN_NAME_CHECK2}}": (
+            f"({check_name2})" if check_name2 and check_count >= 2 else ""
+        ),
+        "{{SIGN_LINE_CHECK3}}": (
+            "ลงชื่อ....................................กรรมการฯ"
+            if check_name3 and check_count >= 3
+            else ""
+        ),
+        "{{SIGN_NAME_CHECK3}}": (
+            f"({check_name3})" if check_name3 and check_count >= 3 else ""
+        ),
+    }
+
+    # --- ส่วนที่ 6: ตรวจสอบข้อมูลสรุป (Preview), Validation & Actions ---
+    st.write("")
+    st.subheader("👁️ 6. ตรวจสอบข้อมูลสรุป (Preview)")
+
+    with st.container(border=True):
+        st.markdown("##### 📄 สรุปรายละเอียดเอกสารจัดจ้าง")
+
+        col_prev1, col_prev2 = st.columns([1, 1], gap="medium")
+        with col_prev1:
+            st.markdown(
+                f"**โครงการ:** {project_name if project_name else '⚠️ *(ยังไม่ได้กรอก)*'}"
+            )
+            st.markdown(
+                f"**หน่วยงาน/แผนก:** {department if department else '⚠️ *(ยังไม่ได้กรอก)*'}"
+            )
+            st.markdown(
+                f"**วงเงินที่จะจ้าง:** {budget_with_text if budget else '⚠️ *(ยังไม่ได้กรอก)*'}"
+            )
+
+            # แจ้งเตือนราคากลางในส่วน Preview
+            if clean_num > 0 and clean_num_mid > clean_num:
+                st.markdown(
+                    f"**ราคากลาง:** {budget_with_text_mid} 🚨 **(สูงกว่าวงเงินที่จะจ้าง)**"
+                )
+            else:
+                st.markdown(
+                    f"**ราคากลาง:** {budget_with_text_mid if budgetmid else '⚠️ *(ยังไม่ได้กรอก)*'}"
+                )
+
+            st.markdown(f"**แหล่งเงิน:** {budget_type_text}")
+            st.markdown(
+                f"**จำนวนรายการ:** {formatted_item_count if item_count_raw else '⚠️ *(ยังไม่ได้กรอก)*'}"
+            )
+
+        with col_prev2:
+            st.markdown(
+                f"**เลขที่คำสั่ง / ข้อตกลง:** {formatted_doc_no if doc_no_raw else '-'} / {formatted_submit_no if submit_no else '-'}"
+            )
+            st.markdown(
+                f"**ผู้รับจ้าง / ร้านค้า:** {vendor_name if vendor_name else '⚠️ *(ยังไม่ได้เลือก)*'}"
+            )
+            st.markdown(f"**วันที่เอกสาร (ส.1):** {formatted_date}")
+            st.markdown(f"**วันที่รายงานผล:** {formatted_date2}")
+            st.markdown(f"**วันที่ใบสั่งจ้าง:** {formatted_date5}")
+            st.markdown(f"**วันที่ตรวจรับ:** {formatted_date4}")
+
+        st.markdown("---")
+        col_prev_buy, col_prev_check = st.columns([1, 1], gap="medium")
+
+        with col_prev_buy:
+            st.markdown("**🛠️ รายชื่อคณะกรรมการจัดจ้าง:**")
+            buy_list_preview = []
+            if buy_name1:
+                buy_list_preview.append(f"1. {buy_name1} ({buy_pos1})")
+            if buy_name2 and buy_count >= 2:
+                buy_list_preview.append(f"2. {buy_name2} ({buy_pos2})")
+            if buy_name3 and buy_count >= 3:
+                buy_list_preview.append(f"3. {buy_name3} ({buy_pos3})")
+
+            if buy_list_preview:
+                for item in buy_list_preview:
+                    st.text(f"  • {item}")
+            else:
+                st.caption("⚠️ ยังไม่มีการเลือกกรรมการจัดจ้าง")
+
+        with col_prev_check:
+            st.markdown("**🔍 รายชื่อคณะกรรมการตรวจรับ:**")
+            check_list_preview = []
+            if check_name1:
+                check_list_preview.append(
+                    f"1. {check_name1} ({'ผู้ตรวจรับการจ้าง' if check_count == 1 else check_pos1})"
+                )
+            if check_name2 and check_count >= 2:
+                check_list_preview.append(f"2. {check_name2} ({check_pos2})")
+            if check_name3 and check_count >= 3:
+                check_list_preview.append(f"3. {check_name3} ({check_pos3})")
+
+            if check_list_preview:
+                for item in check_list_preview:
+                    st.text(f"  • {item}")
+            else:
+                st.caption("⚠️ ยังไม่มีการเลือกกรรมการตรวจรับ")
+
+    st.write("")
+    col_action1, col_action2 = st.columns([1, 4], gap="small")
+
+    with col_action1:
+        st.button(
+            "🗑️ ล้างข้อมูล",
+            use_container_width=True,
+            help="ล้างข้อมูลการกรอกทั้งหมด",
+            key="hiring_reset_btn",
+            on_click=reset_hiring_form,  # 👈 ใช้ callback ตรงนี้
+        )
+    with col_action2:
+        btn_generate = st.button(
+            "🚀 สร้างเอกสารจัดจ้างทั้งหมด",
+            type="primary",
+            use_container_width=True,
+            key="hiring_submit_btn",
+        )
+
+    if btn_generate:
+        missing_fields = []
+        if not project_name.strip():
+            missing_fields.append("ชื่องานจ้าง")
+        if not budget.strip():
+            missing_fields.append("วงเงินที่จะจ้าง")
+        if not department.strip():
+            missing_fields.append("งาน หรือ แผนกวิชา")
+        if not vendor_name:
+            missing_fields.append("ผู้รับจ้าง")
+        if not buy_name1:
+            missing_fields.append("ประธาน/กรรมการจัดจ้างคนที่ 1")
+        if not check_name1:
+            missing_fields.append("ผู้ตรวจรับ / ประธานกรรมการตรวจรับคนที่ 1")
+
+        if missing_fields:
+            st.error(
+                "❌ กรุณากรอกข้อมูลสำคัญให้ครบถ้วนก่อนสร้างเอกสาร:\n- "
+                + "\n- ".join(missing_fields)
+            )
+        elif clean_num > 0 and clean_num_mid > clean_num:
+            st.error(
+                "❌ ไม่สามารถสร้างเอกสารได้เนื่องจาก **ราคากลางสูงกว่าวงเงินที่จะจ้าง** "
+                f"({formatted_budget_mid} > {formatted_budget} บาท) กรุณาตรวจสอบและแก้ไขข้อมูล"
+            )
+        elif not template_files:
+            st.error(
+                "ไม่สามารถสร้างเอกสารได้"
+                f" เนื่องจากไม่มีไฟล์ต้นแบบในโฟลเดอร์ '{TEMPLATE_DIR}'"
+            )
+        else:
+            with st.spinner("กำลังประมวลผลเอกสาร..."):
+                zip_buffer = io.BytesIO()
+
+            with zipfile.ZipFile(zip_buffer, "w") as zip_file:
+                for file_name in template_files:
+                    file_path = os.path.join(TEMPLATE_DIR, file_name)
+                    processed_stream = process_docx(file_path, replacements_data)
+
+                    # --- ส่วนที่เพิ่ม: เปลี่ยนเลขพัสดุในชื่อไฟล์ปลายทาง ---
+                    new_filename = file_name
+                    if parcel_no.strip():
+                        # เปลี่ยนแพตเทิร์น ตัวเลข-ตัวเลข (เช่น 317-69) ในชื่อไฟล์ เป็นเลขพัสดุใหม่
+                        new_filename = re.sub(r"\d+-\d+", parcel_no.strip(), file_name)
+
+                    zip_file.writestr(
+                        f"{new_filename}", processed_stream.getvalue()
+                    )
+
+            zip_buffer.seek(0)
+
+            st.success("🎉 สร้างเอกสารจัดจ้างทั้งหมดสำเร็จแล้ว!")
+
+            st.download_button(
+                label="📦 ดาวน์โหลดชุดเอกสารจัดจ้าง (.zip)",
+                data=zip_buffer,
+                file_name=f"{project_name}_{parcel_no}.zip",
+                mime="application/zip",
+                use_container_width=True,
+            )
+
+
+if __name__ == "__main__":
+    render_hiring_page()
