@@ -188,7 +188,7 @@ def render_hiring_page():
     st.write("")
     st.subheader("👥 2. คำสั่งคณะกรรมการ / ตรวจรับพัสดุ")
     EXCEL_PATH = "teachers.xlsx"
-    person_options, person_dict = load_teacher_data(EXCEL_PATH)
+    person_options, person_dict = load_teacher_data("Teachers")
 
     col_count1, col_count2 = st.columns([1, 1], gap="large")
     with col_count1:
