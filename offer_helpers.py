@@ -2,15 +2,12 @@ import datetime
 import pandas as pd
 import streamlit as st
 
-# 🔗 กำหนด Spreadsheet ID ของ Google Sheet คุณตรงนี้
-# ตัวอย่าง URL: https://docs.google.com/spreadsheets/d/1ABC123xyz_ID_HERE/edit
+# 🔗 กำหนด Spreadsheet ID ของ Google Sheet
 SPREADSHEET_ID = "1hPP2Jks_k9-hKSWzgnVyIJMRWVmo32Qa"
-
 
 def get_sheet_url(sheet_name):
     """สร้าง URL สำหรับดึงข้อมูลเป็น CSV"""
-    return f"https://docs.google.com/spreadsheets/d/1hPP2Jks_k9-hKSWzgnVyIJMRWVmo32Qa/gviz/tq?tqx=out:csv&sheet={sheet_name}"
-
+    return f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
 
 def clean_text_val(val):
     if pd.isna(val) or val is None:
@@ -19,7 +16,6 @@ def clean_text_val(val):
     if val_str.endswith(".0"):
         val_str = val_str[:-2]
     return val_str
-
 
 def load_shops_data():
     """อ่านข้อมูลร้านค้าผ่าน CSV Link (อ่านได้อย่างเดียว)"""
@@ -40,12 +36,10 @@ def load_shops_data():
         st.error(f"⚠️ ไม่สามารถดึงข้อมูลร้านค้าได้: {e}")
         return pd.DataFrame(columns=["shop_name", "address", "phone", "tax_id"])
 
-
 def save_shops_data(df):
     """กรณีอ่านผ่าน CSV จะบันทึกกลับไม่ได้โดยตรง"""
     st.warning("⚠️ การบันทึกข้อมูลต้องทำผ่านหน้า Google Sheets โดยตรงครับ")
     return False
-
 
 def load_teacher_data(sheet_name="Teachers"):
     """อ่านข้อมูลครูผ่าน CSV Link"""
@@ -81,7 +75,6 @@ def load_teacher_data(sheet_name="Teachers"):
         st.warning(f"⚠️ ไม่สามารถอ่านข้อมูลครูได้: {e}")
 
     return person_options, person_dict
-
 
 def add_business_days(start_date, num_days):
     """ฟังก์ชันเพิ่มวันทำการ (ข้ามวันเสาร์-อาทิตย์)"""
