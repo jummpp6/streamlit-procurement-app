@@ -324,68 +324,114 @@ def render_hiring_page():
 
     with col_report2:
         df_shops = load_shops_data()
-        shop_list = [
-            s
-            for s in df_shops["shop_name"].tolist()
-            if s and str(s).strip() not in ["nan", "None", ""]
-        ]
 
+        # 1. จัดการเตรียมข้อมูลร้านค้า
+        if not df_shops.empty:
+            # ค้นหาคอลัมน์ที่เป็นชื่อร้านค้าแบบอัตโนมัติ
+            name_col = next(
+                (
+                    col
+                    for col in df_shops.columns
+                    if str(col).lower() in ["shop_name", "name", "shopname", "ร้านค้า", "ชื่อร้าน"]
+                ),
+                df_shops.columns[0],
+            )
+            df_shops["clean_shop_name"] = (
+                df_shops[name_col].astype(str).str.strip()
+            )
+            shop_list = [
+                s
+                for s in df_shops["clean_shop_name"].unique()
+                if s and s.lower() not in ["nan", "none", "nat", ""]
+            ]
+        else:
+            shop_list = []
+
+        # 2. Selectbox เลือกชื่อร้านค้า
         vendor_name = st.selectbox(
-            "ผู้รับจ้าง / ชื่อบริษัท / ร้านค้า / ผู้รับเหมา",
+            "ชื่อบริษัท / ร้านค้า",
             options=shop_list,
             index=0 if shop_list else None,
-            key="hiring_selected_vendor_name",
+            key="purchase_selected_vendor_name",
         )
 
+        # 3. คำนวณและประมวลผลข้อความที่จะแสดงผล (ทำทันทีที่เลือก)
         c_address, c_phone, c_tax_id = "", "", ""
-        display_text = "ไม่มีข้อมูล"
+        display_lines = []
 
-        if vendor_name:
-            match = df_shops[df_shops["shop_name"] == vendor_name]
+        if vendor_name and not df_shops.empty:
+            # ค้นหาแถวข้อมูลที่ตรงกัน
+            match = df_shops[
+                df_shops["clean_shop_name"] == str(vendor_name).strip()
+            ]
+
             if not match.empty:
                 row = match.iloc[0]
-                c_address = str(row["address"]) if pd.notna(row["address"]) else ""
-                c_phone = str(row["phone"]) if pd.notna(row["phone"]) else ""
-                c_tax_id = str(row["tax_id"]) if pd.notna(row["tax_id"]) else ""
 
-                lines = []
+                # ฟังก์ชันดึงค่าฟิลด์แบบรองรับทุกชื่อคอลัมน์
+                def find_val(candidates):
+                    for cand in candidates:
+                        for c in row.index:
+                            if str(c).lower().strip() == cand.lower():
+                                val = row[c]
+                                if (
+                                    pd.notna(val)
+                                    and str(val).strip().lower()
+                                    not in ["nan", "none", ""]
+                                ):
+                                    return str(val).strip()
+                    return ""
+
+                c_address = find_val(["address", "shop_address", "ที่อยู่", "addr"])
+                c_phone = find_val(["phone", "tel", "เบอร์โทร", "เบอร์โทรศัพท์", "telephone"])
+                c_tax_id = find_val(["tax_id", "taxid", "เลขประจำตัวผู้เสียภาษี", "tax_no", "tax"])
+
                 if c_address:
-                    lines.append(c_address)
+                    display_lines.append(f"ที่อยู่: {c_address}")
                 if c_phone:
-                    lines.append(f"เบอร์โทรศัพท์: {c_phone}")
+                    display_lines.append(f"เบอร์โทรศัพท์: {c_phone}")
                 if c_tax_id:
-                    lines.append(f"เลขประจำตัวผู้เสียภาษี: {c_tax_id}")
+                    display_lines.append(f"เลขประจำตัวผู้เสียภาษี: {c_tax_id}")
 
-                if lines:
-                    display_text = "\n".join(lines)
+        # กำหนดข้อความสุดท้ายที่จะโชว์
+        if display_lines:
+            final_display_text = "\n".join(display_lines)
+        elif vendor_name:
+            final_display_text = "⚠️ เลือกร้านค้าแล้ว แต่ไม่พบข้อมูลที่อยู่/เบอร์โทร/เลขภาษี ในฐานข้อมูล"
+        else:
+            final_display_text = "ยังไม่ได้เลือกร้านค้า หรือไม่มีข้อมูลในระบบ"
 
-        st.markdown("**รายละเอียดผู้รับจ้าง**")
+        st.markdown("**รายละเอียดร้านค้า**")
+
+        # 4. แสดงผล Text Area (ไม่ใส่ Key ซ้ำ เพื่อบังคับให้ Streamlit วาดใหม่ตามค่า final_display_text ทุกครั้ง)
         st.text_area(
-            "รายละเอียดผู้รับจ้าง",
-            value=display_text,
+            "รายละเอียดร้านค้า",
+            value=final_display_text,
             disabled=True,
             height=130,
             label_visibility="collapsed",
-            key="hiring_vendor_display",
         )
 
+        # ปุ่มกด เพิ่ม / แก้ไข
         col_btn_add, col_btn_edit = st.columns([1, 1], gap="small")
         with col_btn_add:
             if st.button(
-                "➕ เพิ่มผู้รับจ้าง",
+                "➕ เพิ่มร้านค้า",
                 use_container_width=True,
-                key="hiring_btn_add_shop",
+                key="purchase_btn_add_shop",
             ):
                 if dialog_decorator:
                     add_shop_modal()
         with col_btn_edit:
             if st.button(
-                "✏️ แก้ไขข้อมูลผู้รับจ้าง",
+                "✏️ แก้ไขข้อมูลร้าน",
                 use_container_width=True,
-                key="hiring_btn_edit_shop",
+                key="purchase_btn_edit_shop",
             ):
                 if dialog_decorator:
-                    edit_address_modal(vendor_name, c_address, c_phone, c_tax_id)
+                    edit_address_modal(
+                        vendor_name, c_address, c_phone, c_tax_id
+                    )
 
     # --- ส่วนที่ 4: ใบสั่งจ้าง ---
     st.write("")
