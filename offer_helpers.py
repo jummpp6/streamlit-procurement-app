@@ -81,3 +81,14 @@ def load_teacher_data(sheet_name="Teachers"):
         st.warning(f"⚠️ ไม่สามารถอ่านข้อมูลครูได้: {e}")
 
     return person_options, person_dict
+
+
+def add_business_days(start_date, num_days):
+    """ฟังก์ชันเพิ่มวันทำการ (ข้ามวันเสาร์-อาทิตย์)"""
+    current_date = start_date
+    added = 0
+    while added < num_days:
+        current_date += datetime.timedelta(days=1)
+        if current_date.weekday() < 5:  # 0-4 คือ จันทร์-ศุกร์
+            added += 1
+    return current_date
