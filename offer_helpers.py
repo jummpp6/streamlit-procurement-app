@@ -9,7 +9,7 @@ SPREADSHEET_ID = "ใส่_SPREADSHEET_ID_ของคุณตรงนี้"
 
 def get_sheet_url(sheet_name):
     """สร้าง URL สำหรับดึงข้อมูลเป็น CSV"""
-    return f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
+    return f"https://docs.google.com/spreadsheets/d/1hPP2Jks_k9-hKSWzgnVyIJMRWVmo32Qa/gviz/tq?tqx=out:csv&sheet={sheet_name}"
 
 
 def clean_text_val(val):
