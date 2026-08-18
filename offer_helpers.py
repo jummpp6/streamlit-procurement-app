@@ -83,35 +83,30 @@ def save_shops_data(df):
         st.error(f"Error saving shops to Google Sheets: {e}")
         return False
 
-# 🟢 3. โหลดข้อมูลครู (ปรับตามโครงสร้าง Google Sheets จริง)
+# 🟢 3. โหลดข้อมูลครู (สำหรับตารางปกติที่เอารวมเซลล์ออกแล้ว)
 def load_teacher_data(sheet_name="Teachers"):
-    """อ่านข้อมูลครูโดยอิงจากตำแหน่งคอลัมน์ B=ชื่อ, C=นามสกุล, D=วิทยฐานะ"""
+    """อ่านข้อมูลครูจาก Google Sheets"""
     person_dict = {}
     person_options = [""]
     try:
         ws = get_gsheet_worksheet(sheet_name)
         rows = ws.get_all_values()
 
-        # วนลูปอ่านข้อมูลตั้งแต่แถวที่ 2 เป็นต้นไป
-        for r in rows[1:]:
-            # ตรวจสอบว่าแถวนั้นมีคอลัมน์ B, C, D หรือไม่
-            if len(r) >= 3:
-                fname = str(r[1]).strip() if r[1] else ""  # คอลัมน์ B
-                lname = str(r[2]).strip() if r[2] else ""  # คอลัมน์ C
-                acad = (
-                    str(r[3]).strip() if len(r) >= 4 and r[3] else ""
-                )  # คอลัมน์ D
+        # ข้ามแถวที่ 1 (Header) แล้วอ่านข้อมูลตั้งแต่แถวที่ 2
+        if len(rows) > 1:
+            for r in rows[1:]:
+                if len(r) >= 3:
+                    fname = str(r[1]).strip() if r[1] else ""  # คอลัมน์ B (ชื่อ)
+                    lname = str(r[2]).strip() if r[2] else ""  # คอลัมน์ C (นามสกุล)
+                    acad = (
+                        str(r[3]).strip() if len(r) >= 4 and r[3] else ""
+                    )  # คอลัมน์ D (วิทยฐานะ)
 
-                # กรองเอาเฉพาะแถวที่มีทั้งชื่อและนามสกุล (ข้ามพวกแถวหัวข้อหมวดหมู่)
-                if (
-                    fname
-                    and lname
-                    and fname not in ["ชื่อ - สกุล", "ฝ่ายบริหาร"]
-                ):
-                    full_name = f"{fname} {lname}".strip()
-                    if full_name not in person_dict:
-                        person_options.append(full_name)
-                        person_dict[full_name] = acad
+                    if fname and lname:
+                        full_name = f"{fname} {lname}".strip()
+                        if full_name not in person_dict:
+                            person_options.append(full_name)
+                            person_dict[full_name] = acad
 
     except Exception as e:
         st.warning(f"Error loading teachers: {e}")
