@@ -326,53 +326,66 @@ def render_purchase_page():
     with col_report2:
         df_shops = load_shops_data()
         
-        # ทำการ Clean ข้อมูลชื่อร้านค้าก่อนใส่ใน Dropdown
-        shop_list = []
-        if not df_shops.empty and "shop_name" in df_shops.columns:
-            df_shops["shop_name_clean"] = df_shops["shop_name"].astype(str).str.strip()
-            shop_list = [
-                s for s in df_shops["shop_name_clean"].unique() 
-                if s and s not in ["nan", "None", ""]
-            ]
-
-        vendor_name = st.selectbox(
-            "ชื่อบริษัท / ร้านค้า",
-            options=shop_list,
-            index=0 if shop_list else None,
-            key="purchase_selected_vendor_name",
-        )
-
         c_address, c_phone, c_tax_id = "", "", ""
         display_text = "ไม่มีข้อมูล"
+        vendor_name = None
 
-        if vendor_name:
-            # ค้นหาร้านค้าโดยใช้ Str strip ทั้งสองฝั่งเพื่อป้องกันช่องว่างเกิน
-            match = df_shops[df_shops["shop_name_clean"] == str(vendor_name).strip()]
-            if not match.empty:
-                row = match.iloc[0]
+        if not df_shops.empty:
+            # 1. หา คอลัมน์ที่เป็นชื่อร้านค้า (รองรับ shop_name, name, shopName)
+            name_col = next((col for col in df_shops.columns if str(col).lower() in ['shop_name', 'name', 'shopname']), df_shops.columns[0])
+            
+            # Clean ค่าชื่อร้าน
+            df_shops['clean_shop_name'] = df_shops[name_col].astype(str).str.strip()
+            shop_list = [s for s in df_shops['clean_shop_name'].unique() if s and s.lower() not in ['nan', 'none', 'nat', '']]
 
-                def get_clean_val(val):
-                    if pd.isna(val) or val is None:
+            vendor_name = st.selectbox(
+                "ชื่อบริษัท / ร้านค้า",
+                options=shop_list,
+                index=0 if shop_list else None,
+                key="purchase_selected_vendor_name"
+            )
+
+            if vendor_name:
+                # 2. ค้นหา Row ของร้านที่เลือก
+                match = df_shops[df_shops['clean_shop_name'] == str(vendor_name).strip()]
+                
+                if not match.empty:
+                    row = match.iloc[0]
+                    
+                    # ฟังก์ชันดึงค่าแบบยืดหยุ่น (ลองหาชื่อคอลัมน์หลายๆ แบบ)
+                    def get_col_val(possible_names):
+                        for p in possible_names:
+                            for col in row.index:
+                                if str(col).lower().strip() == p.lower():
+                                    val = row[col]
+                                    if pd.notna(val) and str(val).strip().lower() not in ['nan', 'none', '']:
+                                        return str(val).strip()
                         return ""
-                    s_val = str(val).strip()
-                    return "" if s_val in ["nan", "None"] else s_val
 
-                c_address = get_clean_val(row.get("address"))
-                c_phone = get_clean_val(row.get("phone"))
-                c_tax_id = get_clean_val(row.get("tax_id"))
+                    c_address = get_col_val(['address', 'shop_address', 'ที่อยู่', 'addr'])
+                    c_phone = get_col_val(['phone', 'tel', 'เบอร์โทร', 'เบอร์โทรศัพท์', 'telephone'])
+                    c_tax_id = get_col_val(['tax_id', 'taxid', 'เลขประจำตัวผู้เสียภาษี', 'tax_no', 'tax'])
 
-                lines = []
-                if c_address:
-                    lines.append(f"ที่อยู่: {c_address}")
-                if c_phone:
-                    lines.append(f"เบอร์โทรศัพท์: {c_phone}")
-                if c_tax_id:
-                    lines.append(f"เลขประจำตัวผู้เสียภาษี: {c_tax_id}")
+                    lines = []
+                    if c_address:
+                        lines.append(f"ที่อยู่: {c_address}")
+                    if c_phone:
+                        lines.append(f"เบอร์โทรศัพท์: {c_phone}")
+                    if c_tax_id:
+                        lines.append(f"เลขประจำตัวผู้เสียภาษี: {c_tax_id}")
 
-                if lines:
-                    display_text = "\n".join(lines)
-                else:
-                    display_text = "เลือกร้านค้าแล้ว แต่ไม่พบข้อมูลที่อยู่/เบอร์โทรศัพท์/เลขภาษี"
+                    if lines:
+                        display_text = "\n".join(lines)
+                    else:
+                        # แสดง Key/Columns ทั้งหมดใน DataFrame เพื่อให้ Debug ได้ง่าย
+                        display_text = f"พบร้านค้าแต่ไม่พบคอลัมน์ข้อมูล (คอลัมน์ที่มี: {list(df_shops.columns)})"
+        else:
+            shop_list = []
+            vendor_name = st.selectbox(
+                "ชื่อบริษัท / ร้านค้า",
+                options=[],
+                key="purchase_selected_vendor_name"
+            )
 
         st.markdown("**รายละเอียดร้านค้า**")
         st.text_area(
@@ -381,24 +394,16 @@ def render_purchase_page():
             disabled=True,
             height=130,
             label_visibility="collapsed",
-            key="purchase_vendor_display",
+            key="purchase_vendor_display"
         )
 
         col_btn_add, col_btn_edit = st.columns([1, 1], gap="small")
         with col_btn_add:
-            if st.button(
-                "➕ เพิ่มร้านค้า",
-                use_container_width=True,
-                key="purchase_btn_add_shop",
-            ):
+            if st.button("➕ เพิ่มร้านค้า", use_container_width=True, key="purchase_btn_add_shop"):
                 if dialog_decorator:
                     add_shop_modal()
         with col_btn_edit:
-            if st.button(
-                "✏️ แก้ไขข้อมูลร้าน",
-                use_container_width=True,
-                key="purchase_btn_edit_shop",
-            ):
+            if st.button("✏️ แก้ไขข้อมูลร้าน", use_container_width=True, key="purchase_btn_edit_shop"):
                 if dialog_decorator:
                     edit_address_modal(vendor_name, c_address, c_phone, c_tax_id)
 
