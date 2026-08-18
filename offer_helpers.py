@@ -4,7 +4,7 @@ import streamlit as st
 
 # 🔗 กำหนด Spreadsheet ID ของ Google Sheet คุณตรงนี้
 # ตัวอย่าง URL: https://docs.google.com/spreadsheets/d/1ABC123xyz_ID_HERE/edit
-SPREADSHEET_ID = "ใส่_SPREADSHEET_ID_ของคุณตรงนี้"
+SPREADSHEET_ID = "1hPP2Jks_k9-hKSWzgnVyIJMRWVmo32Qa"
 
 
 def get_sheet_url(sheet_name):
