@@ -324,76 +324,76 @@ def render_purchase_page():
             st.error("⚠️ **คำเตือน:** วงเงินราคากลางสูงกว่าวงเงินงบประมาณ!")
 
         with col_report2:
-                df_shops = load_shops_data()
-                shop_list = [
-                    s
-                    for s in df_shops["shop_name"].tolist()
-                    if s and str(s).strip() not in ["nan", "None", ""]
-                ]
+        df_shops = load_shops_data()
+        shop_list = [
+            s
+            for s in df_shops["shop_name"].tolist()
+            if s and str(s).strip() not in ["nan", "None", ""]
+        ]
 
-                vendor_name = st.selectbox(
-                    "ชื่อบริษัท / ร้านค้า",
-                    options=shop_list,
-                    index=0 if shop_list else None,
-                    key="purchase_selected_vendor_name",
-                )
+        vendor_name = st.selectbox(
+            "ชื่อบริษัท / ร้านค้า",
+            options=shop_list,
+            index=0 if shop_list else None,
+            key="purchase_selected_vendor_name",
+        )
 
-                c_address, c_phone, c_tax_id = "", "", ""
-                display_text = "ไม่มีข้อมูล"
+        c_address, c_phone, c_tax_id = "", "", ""
+        display_text = "ไม่มีข้อมูล"
 
-                if vendor_name:
-                    match = df_shops[df_shops["shop_name"] == vendor_name]
-                    if not match.empty:
-                        row = match.iloc[0]
+        if vendor_name:
+            match = df_shops[df_shops["shop_name"] == vendor_name]
+            if not match.empty:
+                row = match.iloc[0]
 
-                        def get_clean_val(val):
-                            if pd.isna(val) or val is None:
-                                return ""
-                            s_val = str(val).strip()
-                            return "" if s_val in ["nan", "None"] else s_val
+                def get_clean_val(val):
+                    if pd.isna(val) or val is None:
+                        return ""
+                    s_val = str(val).strip()
+                    return "" if s_val in ["nan", "None"] else s_val
 
-                        c_address = get_clean_val(row.get("address"))
-                        c_phone = get_clean_val(row.get("phone"))
-                        c_tax_id = get_clean_val(row.get("tax_id"))
+                c_address = get_clean_val(row.get("address"))
+                c_phone = get_clean_val(row.get("phone"))
+                c_tax_id = get_clean_val(row.get("tax_id"))
 
-                        lines = []
-                        if c_address:
-                            lines.append(c_address)
-                        if c_phone:
+                lines = []
+                if c_address:
+                    lines.append(c_address)
+                if c_phone:
                     lines.append(f"เบอร์โทรศัพท์: {c_phone}")
-                        if c_tax_id:
-                            lines.append(f"เลขประจำตัวผู้เสียภาษี: {c_tax_id}")
+                if c_tax_id:
+                    lines.append(f"เลขประจำตัวผู้เสียภาษี: {c_tax_id}")
 
-                        if lines:
-                            display_text = "\n".join(lines)
+                if lines:
+                    display_text = "\n".join(lines)
 
-                st.markdown("**รายละเอียดร้านค้า**")
-                st.text_area(
-                    "รายละเอียดร้านค้า",
-                    value=display_text,
-                    disabled=True,
-                    height=130,
-                    label_visibility="collapsed",
-                    key="purchase_vendor_display",
-                )
+        st.markdown("**รายละเอียดร้านค้า**")
+        st.text_area(
+            "รายละเอียดร้านค้า",
+            value=display_text,
+            disabled=True,
+            height=130,
+            label_visibility="collapsed",
+            key="purchase_vendor_display",
+        )
 
-                col_btn_add, col_btn_edit = st.columns([1, 1], gap="small")
-                with col_btn_add:
-                    if st.button(
-                        "➕ เพิ่มร้านค้า",
-                        use_container_width=True,
-                        key="purchase_btn_add_shop",
-                    ):
-                        if dialog_decorator:
-                            add_shop_modal()
-                with col_btn_edit:
-                    if st.button(
-                        "✏️ แก้ไขข้อมูลร้าน",
-                        use_container_width=True,
-                        key="purchase_btn_edit_shop",
-                    ):
-                        if dialog_decorator:
-                            edit_address_modal(vendor_name, c_address, c_phone, c_tax_id)
+        col_btn_add, col_btn_edit = st.columns([1, 1], gap="small")
+        with col_btn_add:
+            if st.button(
+                "➕ เพิ่มร้านค้า",
+                use_container_width=True,
+                key="purchase_btn_add_shop",
+            ):
+                if dialog_decorator:
+                    add_shop_modal()
+        with col_btn_edit:
+            if st.button(
+                "✏️ แก้ไขข้อมูลร้าน",
+                use_container_width=True,
+                key="purchase_btn_edit_shop",
+            ):
+                if dialog_decorator:
+                    edit_address_modal(vendor_name, c_address, c_phone, c_tax_id)
 
     # --- ส่วนที่ 4: ใบสั่งซื้อ ---
     st.write("")
