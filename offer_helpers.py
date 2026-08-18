@@ -18,33 +18,28 @@ def clean_text_val(val):
     return val_str
 
 def load_shops_data():
-    """อ่านข้อมูลร้านค้าจากคอลัมน์ A ถึง D โดยตรง"""
+    """อ่านข้อมูลร้านค้าตามหัวตาราง shop_name, address, phone, tax_id"""
     try:
         url = get_sheet_url("Shops")
-        # header=None เพื่ออ่านทุกแถวเป็นข้อมูล ไม่ต้องสนหัวตาราง
-        df = pd.read_csv(url, header=None, dtype=str)
+        df = pd.read_csv(url, dtype=str)
         
-        if df.empty or len(df) < 2:
-            return pd.DataFrame(columns=["shop_name", "address", "phone", "tax_id"])
+        # ตัดช่องว่างรอบๆ ชื่อหัวคอลัมน์ทั้งหมด (แก้ปัญหาอักษรซ่อน)
+        df.columns = df.columns.str.strip()
 
-        shops_list = []
-        for index, row in df.iterrows():
-            if index == 0:  # ข้ามแถวแรก (หัวตาราง)
-                continue
-            
-            # ดึงข้อมูลจากคอลัมน์ A(0), B(1), C(2), D(3)
-            s_name = clean_text_val(row[0]) if len(row) > 0 else ""
-            if not s_name or s_name in ["nan", "None"]:
-                continue
-                
-            shops_list.append({
-                "shop_name": s_name,
-                "address": clean_text_val(row[1]) if len(row) > 1 else "",
-                "phone": clean_text_val(row[2]) if len(row) > 2 else "",
-                "tax_id": clean_text_val(row[3]) if len(row) > 3 else ""
-            })
+        # ตรวจสอบว่ามีคอลัมน์หลักครบไหม ถ้าไม่มีให้สร้างเป็นค่าว่าง
+        for col in ["shop_name", "address", "phone", "tax_id"]:
+            if col not in df.columns:
+                df[col] = ""
 
-        return pd.DataFrame(shops_list)
+        # ตัดแถวที่ไม่มีชื่อร้านออก
+        df = df.dropna(subset=["shop_name"])
+        df = df[df["shop_name"].str.strip() != ""]
+
+        # ทำความสะอาดข้อมูลในแต่ละช่อง
+        for col in ["shop_name", "address", "phone", "tax_id"]:
+            df[col] = df[col].apply(clean_text_val)
+
+        return df
     except Exception as e:
         st.error(f"Error loading shops: {e}")
         return pd.DataFrame(columns=["shop_name", "address", "phone", "tax_id"])
