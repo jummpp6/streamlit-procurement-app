@@ -2,7 +2,7 @@ import datetime
 import pandas as pd
 import streamlit as st
 
-# กหนด Spreadsheet ID ของ Google Sheet
+# 🔗 กำหนด Spreadsheet ID ของ Google Sheet
 SPREADSHEET_ID = "1hPP2Jks_k9-hKSWzgnVyIJMRWVmo32Qa"
 
 def get_sheet_url(sheet_name):
@@ -32,6 +32,11 @@ def load_shops_data():
     except Exception as e:
         st.error(f"Error loading shops: {e}")
         return pd.DataFrame(columns=["shop_name", "address", "phone", "tax_id"])
+
+def save_shops_data(df):
+    """กรณีอ่านผ่าน CSV จะบันทึกกลับไม่ได้โดยตรง"""
+    st.warning("⚠️ การบันทึกข้อมูลต้องทำผ่านหน้า Google Sheets โดยตรงครับ")
+    return False
 
 def load_teacher_data(sheet_name="Teachers"):
     """อ่านข้อมูลครูผ่าน CSV Link"""
