@@ -83,7 +83,7 @@ def save_shops_data(df):
         st.error(f"Error saving shops to Google Sheets: {e}")
         return False
 
-# 🟢 3. โหลดข้อมูลครู (สำหรับตารางปกติที่เอารวมเซลล์ออกแล้ว)
+# 🟢 3. โหลดข้อมูลครู (ปรับตามตารางล่าสุด: B=ชื่อ-นามสกุล, C=วิทยฐานะ)
 def load_teacher_data(sheet_name="Teachers"):
     """อ่านข้อมูลครูจาก Google Sheets"""
     person_dict = {}
@@ -92,21 +92,23 @@ def load_teacher_data(sheet_name="Teachers"):
         ws = get_gsheet_worksheet(sheet_name)
         rows = ws.get_all_values()
 
-        # ข้ามแถวที่ 1 (Header) แล้วอ่านข้อมูลตั้งแต่แถวที่ 2
+        # อ่านข้อมูลตั้งแต่แถวที่ 2 เป็นต้นไป (ข้าม Header แถวแรก)
         if len(rows) > 1:
             for r in rows[1:]:
-                if len(r) >= 3:
-                    fname = str(r[1]).strip() if r[1] else ""  # คอลัมน์ B (ชื่อ)
-                    lname = str(r[2]).strip() if r[2] else ""  # คอลัมน์ C (นามสกุล)
-                    acad = (
-                        str(r[3]).strip() if len(r) >= 4 and r[3] else ""
-                    )  # คอลัมน์ D (วิทยฐานะ)
+                if len(r) >= 2:
+                    # คอลัมน์ B (Index 1) คือ ชื่อ-สกุล
+                    full_name = str(r[1]).strip() if r[1] else ""
+                    # คอลัมน์ C (Index 2) คือ วิทยฐานะ
+                    acad = str(r[2]).strip() if len(r) >= 3 and r[2] else ""
 
-                    if fname and lname:
-                        full_name = f"{fname} {lname}".strip()
-                        if full_name not in person_dict:
-                            person_options.append(full_name)
-                            person_dict[full_name] = acad
+                    # กรองเอาเฉพาะแถวที่มีข้อมูลชื่อ และไม่ตรงกับหัวข้อตาราง
+                    if (
+                        full_name
+                        and full_name not in ["ชื่อ - สกุล", "ลำดับที่"]
+                        and full_name not in person_dict
+                    ):
+                        person_options.append(full_name)
+                        person_dict[full_name] = acad
 
     except Exception as e:
         st.warning(f"Error loading teachers: {e}")
