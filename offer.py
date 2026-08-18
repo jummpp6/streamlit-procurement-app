@@ -26,7 +26,7 @@ from offer_modals import add_shop_modal, dialog_decorator, edit_address_modal
 def reset_purchase_form():
     """ฟังก์ชันสำหรับล้างข้อมูลในฟอร์มจัดซื้อ (เรียกใช้ผ่าน on_click)"""
     keys_to_clear = [
-        "purchase_parcel_no",  # 👈 ล้างเลขพัสดุ
+        "purchase_parcel_no",
         "purchase_project_name",
         "purchase_budget",
         "purchase_item_count",
@@ -37,6 +37,7 @@ def reset_purchase_form():
         "purchase_sub_grant",
         "purchase_sub_budget",
         "purchase_submit_no",
+        "purchase_selected_vendor_name",
     ]
     for key in keys_to_clear:
         if key in st.session_state:
@@ -84,7 +85,6 @@ def render_purchase_page():
             "",
             placeholder="ตัวอย่าง: เลขพัสดุ (เช่น 317-69 หรือ 111-69)",
             key="purchase_parcel_no",
-            # ซ่อน Label เพื่อให้วางเรียงสวยงาม
         )
 
     TEMPLATE_DIR = "templates"
@@ -325,11 +325,15 @@ def render_purchase_page():
 
     with col_report2:
         df_shops = load_shops_data()
-        shop_list = [
-            s
-            for s in df_shops["shop_name"].tolist()
-            if s and str(s).strip() not in ["nan", "None", ""]
-        ]
+        
+        # ทำการ Clean ข้อมูลชื่อร้านค้าก่อนใส่ใน Dropdown
+        shop_list = []
+        if not df_shops.empty and "shop_name" in df_shops.columns:
+            df_shops["shop_name_clean"] = df_shops["shop_name"].astype(str).str.strip()
+            shop_list = [
+                s for s in df_shops["shop_name_clean"].unique() 
+                if s and s not in ["nan", "None", ""]
+            ]
 
         vendor_name = st.selectbox(
             "ชื่อบริษัท / ร้านค้า",
@@ -342,7 +346,8 @@ def render_purchase_page():
         display_text = "ไม่มีข้อมูล"
 
         if vendor_name:
-            match = df_shops[df_shops["shop_name"] == vendor_name]
+            # ค้นหาร้านค้าโดยใช้ Str strip ทั้งสองฝั่งเพื่อป้องกันช่องว่างเกิน
+            match = df_shops[df_shops["shop_name_clean"] == str(vendor_name).strip()]
             if not match.empty:
                 row = match.iloc[0]
 
@@ -358,7 +363,7 @@ def render_purchase_page():
 
                 lines = []
                 if c_address:
-                    lines.append(c_address)
+                    lines.append(f"ที่อยู่: {c_address}")
                 if c_phone:
                     lines.append(f"เบอร์โทรศัพท์: {c_phone}")
                 if c_tax_id:
@@ -366,6 +371,8 @@ def render_purchase_page():
 
                 if lines:
                     display_text = "\n".join(lines)
+                else:
+                    display_text = "เลือกร้านค้าแล้ว แต่ไม่พบข้อมูลที่อยู่/เบอร์โทรศัพท์/เลขภาษี"
 
         st.markdown("**รายละเอียดร้านค้า**")
         st.text_area(
@@ -461,7 +468,7 @@ def render_purchase_page():
         "{{BUDGET_TYPE}}": budget_type_text,
         "{{ITEM_COUNT}}": formatted_item_count,
         "{{DEPARTMENT}}": department,
-        "{{VENDOR_NAME}}": vendor_name,
+        "{{VENDOR_NAME}}": vendor_name if vendor_name else "",
         "{{VENDOR_ADDRESS}}": to_thai_num(c_address),
         "{{VENDOR_PHONE}}": to_thai_num(c_phone),
         "{{VENDOR_TAX_ID}}": to_thai_num(c_tax_id),
@@ -716,10 +723,8 @@ def render_purchase_page():
                         file_path = os.path.join(TEMPLATE_DIR, file_name)
                         processed_stream = process_docx(file_path, replacements_data)
 
-                        # --- ลอจิกเปลี่ยนเลขพัสดุในชื่อไฟล์ปลายทาง ---
                         new_filename = file_name
                         if parcel_no.strip():
-                            # เปลี่ยนตัวเลข-ตัวเลข (เช่น 317-69 หรือเลขอื่น) ให้เป็น parcel_no ที่กรอกมา
                             new_filename = re.sub(
                                 r"\d+-\d+", parcel_no.strip(), file_name
                             )
