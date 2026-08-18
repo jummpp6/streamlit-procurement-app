@@ -323,7 +323,7 @@ def render_purchase_page():
         if clean_num > 0 and clean_num_mid > clean_num:
             st.error("⚠️ **คำเตือน:** วงเงินราคากลางสูงกว่าวงเงินงบประมาณ!")
 
-        with col_report2:
+    with col_report2:
         df_shops = load_shops_data()
         shop_list = [
             s
