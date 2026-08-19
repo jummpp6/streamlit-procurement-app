@@ -647,7 +647,7 @@ def render_purchase_page():
                 f"**เลขที่คำสั่ง:** {formatted_doc_no if doc_no_raw else '-'}"
             )
             st.markdown(
-                f"**ข้อตกลง:** {formatted_submit_no if submit_no else '-'}"
+                f"**เลขที่ข้อตกลง:** {formatted_submit_no if submit_no else '-'}"
             )
             st.markdown(
                 f"**ร้านค้า / ผู้เสนอราคา:** {vendor_name if vendor_name else '⚠️ *(ยังไม่ได้เลือก)*'}"
