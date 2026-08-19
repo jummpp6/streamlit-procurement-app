@@ -124,8 +124,8 @@ def render_purchase_page():
         st.info(f"💡 **แปลงเป็นตัวหนังสืออัตโนมัติ:** {budget_text}")
 
         item_count_raw = st.text_input(
-            "จำนวนรายการ (เช่น 5 รายการ)",
-            placeholder="ตัวอย่าง: 5 รายการ",
+            "จำนวนรายการ (เช่น 5, 7, 9 (ไม่ต้องพิมพ์รายการต่อท้าย))",
+            placeholder="ตัวอย่าง: 5",
             key="purchase_item_count",
         )
 
@@ -161,7 +161,7 @@ def render_purchase_page():
 
     with col2:
         department = st.text_input(
-            "งาน หรือ แผนกวิชาที่จัดทำ",
+            "งาน หรือ แผนกวิชาที่จัดทำ (ใส่งานหรือแผนกวิชาก่อน เช่น งานพัสดุ/แผนกวิชาช่างยนต์)",
             placeholder="ตัวอย่าง: แผนกวิชาช่างยนต์ / งานกิจกรรมนักเรียนนักศึกษา",
             key="purchase_dept",
         )
