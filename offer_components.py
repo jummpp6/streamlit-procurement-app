@@ -55,6 +55,9 @@ def render_person_inputs(
 
         pos_index = pos_options.index(default_pos) if default_pos in pos_options else 0
 
+        # แปลงตัวเลือกตำแหน่งทั้งหมดใน pos_options ให้เป็นเลขไทย
+        pos_options = [arabic_to_thai_num(opt) for opt in pos_options]
+
         position = st.selectbox(
             f"ตำแหน่ง ({label_title})",
             options=pos_options,
