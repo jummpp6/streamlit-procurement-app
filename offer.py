@@ -112,6 +112,8 @@ def render_purchase_page():
             placeholder="ตัวอย่าง: 4996",
             key="purchase_budget",
         )
+
+        # แปลงวงเงินงบประมาณ
         clean_num = 0.0
         try:
             clean_num = float(
@@ -119,7 +121,7 @@ def render_purchase_page():
             )
             budget_text = bahttext(clean_num)
         except ValueError:
-            budget_text = budget
+            budget_text = budget if budget else "-"
 
         st.info(f"💡 **แปลงเป็นตัวหนังสืออัตโนมัติ:** {budget_text}")
 
@@ -187,7 +189,6 @@ def render_purchase_page():
     # --- ส่วนที่ 2: คณะกรรมการ ---
     st.write("")
     st.subheader("👥 2. คำสั่งคณะกรรมการจัดซื้อ / ตรวจรับ")
-    EXCEL_PATH = "teachers.xlsx"
     person_options, person_dict = load_teacher_data("Teachers")
 
     col_count1, col_count2 = st.columns([1, 1], gap="large")
@@ -309,6 +310,7 @@ def render_purchase_page():
             key="purchase_budget_mid",
         )
 
+        # แปลงวงเงินราคากลาง
         clean_num_mid = 0.0
         try:
             clean_num_mid = float(
@@ -316,7 +318,7 @@ def render_purchase_page():
             )
             budget_text_mid = bahttext(clean_num_mid)
         except ValueError:
-            budget_text_mid = budgetmid
+            budget_text_mid = budgetmid if budgetmid else "-"
 
         st.info(f"💡 **แปลงเป็นตัวหนังสืออัตโนมัติ:** {budget_text_mid}")
 
@@ -326,7 +328,6 @@ def render_purchase_page():
     with col_report2:
         df_shops = load_shops_data()
 
-        # 1. จัดการเตรียมข้อมูลร้านค้า
         if not df_shops.empty:
             name_col = next(
                 (
@@ -347,7 +348,6 @@ def render_purchase_page():
         else:
             shop_list = []
 
-        # 2. Selectbox เลือกชื่อร้านค้า
         vendor_name = st.selectbox(
             "ชื่อบริษัท / ร้านค้า",
             options=shop_list,
@@ -355,7 +355,6 @@ def render_purchase_page():
             key="purchase_selected_vendor_name",
         )
 
-        # 3. คำนวณและประมวลผลข้อความที่จะแสดงผล
         c_address, c_phone, c_tax_id = "", "", ""
         display_lines = []
 
@@ -408,7 +407,6 @@ def render_purchase_page():
             label_visibility="collapsed",
         )
 
-        # ปุ่มกด เพิ่ม / แก้ไข
         col_btn_add, col_btn_edit = st.columns([1, 1], gap="small")
         with col_btn_add:
             if st.button(
@@ -460,7 +458,6 @@ def render_purchase_page():
     )
 
     # --- ประมวลผลแปลงตัวเลข/วันที่ ---
-    # 🟢 [ข้อ 1] แปลงชื่อโครงการเป็นเลขไทย
     project_name_thai = to_thai_num(project_name)
 
     formatted_budget = format_budget_money(budget, use_thai=use_thai_num)
@@ -488,7 +485,7 @@ def render_purchase_page():
     budget_with_text_mid = f"{formatted_budget_mid} บาท ({budget_text_mid})"
 
     replacements_data = {
-        "{{PROJECT_NAME}}": project_name_thai,  # 👈 ใช้ค่าที่แปลงเป็นเลขไทยแล้ว
+        "{{PROJECT_NAME}}": project_name_thai,
         "{{BUDGET}}": formatted_budget,
         "{{BUDGET_MID}}": formatted_budget_mid,
         "{{BUDGET_TEXT}}": budget_text,
@@ -767,10 +764,16 @@ def render_purchase_page():
 
             st.success("🎉 สร้างเอกสารจัดซื้อทั้งหมดสำเร็จแล้ว!")
 
+            zip_filename = (
+                f"{project_name_thai}_{parcel_no}.zip"
+                if parcel_no.strip()
+                else f"เอกสารจัดซื้อ_{datetime.date.today().strftime('%Y%m%d')}.zip"
+            )
+
             st.download_button(
                 label="📦 ดาวน์โหลดชุดเอกสารจัดซื้อ (.zip)",
                 data=zip_buffer,
-                file_name=f"{project_name_thai}_{parcel_no}.zip",
+                file_name=zip_filename,
                 mime="application/zip",
                 use_container_width=True,
             )
