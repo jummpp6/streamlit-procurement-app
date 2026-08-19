@@ -70,7 +70,7 @@ def render_hiring_page():
         unsafe_allow_html=True,
     )
 
-    st.title("🛒 ระบบสร้างเอกสารจ้าง")  # หรือชื่อหน้าของ hiring.py
+    st.title("🛒 ระบบสร้างเอกสารจ้าง")
 
     # --- แถวบนสุด: ปุ่มกลับหน้าหลัก + ช่องกรอกเลขพัสดุ ---
     col_top1, col_top2 = st.columns([1, 2], gap="medium")
@@ -80,12 +80,11 @@ def render_hiring_page():
             st.rerun()
 
     with col_top2:
-            parcel_no = st.text_input(
-                "",
-                placeholder="ตัวอย่าง: เลขพัสดุ (เช่น 317-69 หรือ 111-69)",
-                key="purchase_parcel_no",
-                # ซ่อน Label เพื่อให้วางเรียงสวยงาม
-            )
+        parcel_no = st.text_input(
+            "",
+            placeholder="ตัวอย่าง: เลขพัสดุ (เช่น 317-69 หรือ 111-69)",
+            key="purchase_parcel_no",
+        )
 
     TEMPLATE_DIR = "templates_hiring"
     if not os.path.exists(TEMPLATE_DIR):
@@ -327,7 +326,6 @@ def render_hiring_page():
 
         # 1. จัดการเตรียมข้อมูลร้านค้า
         if not df_shops.empty:
-            # ค้นหาคอลัมน์ที่เป็นชื่อร้านค้าแบบอัตโนมัติ
             name_col = next(
                 (
                     col
@@ -355,12 +353,11 @@ def render_hiring_page():
             key="purchase_selected_vendor_name",
         )
 
-        # 3. คำนวณและประมวลผลข้อความที่จะแสดงผล (ทำทันทีที่เลือก)
+        # 3. คำนวณและประมวลผลข้อความที่จะแสดงผล
         c_address, c_phone, c_tax_id = "", "", ""
         display_lines = []
 
         if vendor_name and not df_shops.empty:
-            # ค้นหาแถวข้อมูลที่ตรงกัน
             match = df_shops[
                 df_shops["clean_shop_name"] == str(vendor_name).strip()
             ]
@@ -368,7 +365,6 @@ def render_hiring_page():
             if not match.empty:
                 row = match.iloc[0]
 
-                # ฟังก์ชันดึงค่าฟิลด์แบบรองรับทุกชื่อคอลัมน์
                 def find_val(candidates):
                     for cand in candidates:
                         for c in row.index:
@@ -393,7 +389,6 @@ def render_hiring_page():
                 if c_tax_id:
                     display_lines.append(f"เลขประจำตัวผู้เสียภาษี: {c_tax_id}")
 
-        # กำหนดข้อความสุดท้ายที่จะโชว์
         if display_lines:
             final_display_text = "\n".join(display_lines)
         elif vendor_name:
@@ -403,7 +398,6 @@ def render_hiring_page():
 
         st.markdown("**รายละเอียดร้านค้า**")
 
-        # 4. แสดงผล Text Area (ไม่ใส่ Key ซ้ำ เพื่อบังคับให้ Streamlit วาดใหม่ตามค่า final_display_text ทุกครั้ง)
         st.text_area(
             "รายละเอียดร้านค้า",
             value=final_display_text,
@@ -412,7 +406,6 @@ def render_hiring_page():
             label_visibility="collapsed",
         )
 
-        # ปุ่มกด เพิ่ม / แก้ไข
         col_btn_add, col_btn_edit = st.columns([1, 1], gap="small")
         with col_btn_add:
             if st.button(
@@ -463,6 +456,9 @@ def render_hiring_page():
     )
 
     # --- ประมวลผลแปลงตัวเลข/วันที่ ---
+    formatted_project_name = (
+        to_thai_num(project_name) if use_thai_num else str(project_name)
+    )
     formatted_budget = format_budget_money(budget, use_thai=use_thai_num)
     formatted_budget_mid = format_budget_money(budgetmid, use_thai=use_thai_num2)
 
@@ -488,7 +484,7 @@ def render_hiring_page():
     budget_with_text_mid = f"{formatted_budget_mid} บาท ({budget_text_mid})"
 
     replacements_data = {
-        "{{PROJECT_NAME}}": project_name,
+        "{{PROJECT_NAME}}": formatted_project_name,
         "{{BUDGET}}": formatted_budget,
         "{{BUDGET_MID}}": formatted_budget_mid,
         "{{BUDGET_TEXT}}": budget_text,
@@ -619,7 +615,7 @@ def render_hiring_page():
         col_prev1, col_prev2 = st.columns([1, 1], gap="medium")
         with col_prev1:
             st.markdown(
-                f"**โครงการ:** {project_name if project_name else '⚠️ *(ยังไม่ได้กรอก)*'}"
+                f"**โครงการ:** {formatted_project_name if project_name else '⚠️ *(ยังไม่ได้กรอก)*'}"
             )
             st.markdown(
                 f"**หน่วยงาน/แผนก:** {department if department else '⚠️ *(ยังไม่ได้กรอก)*'}"
@@ -628,7 +624,6 @@ def render_hiring_page():
                 f"**วงเงินที่จะจ้าง:** {budget_with_text if budget else '⚠️ *(ยังไม่ได้กรอก)*'}"
             )
 
-            # แจ้งเตือนราคากลางในส่วน Preview
             if clean_num > 0 and clean_num_mid > clean_num:
                 st.markdown(
                     f"**ราคากลาง:** {budget_with_text_mid} 🚨 **(สูงกว่าวงเงินที่จะจ้าง)**"
@@ -704,7 +699,7 @@ def render_hiring_page():
             use_container_width=True,
             help="ล้างข้อมูลการกรอกทั้งหมด",
             key="hiring_reset_btn",
-            on_click=reset_hiring_form,  # 👈 ใช้ callback ตรงนี้
+            on_click=reset_hiring_form,
         )
     with col_action2:
         btn_generate = st.button(
@@ -753,10 +748,8 @@ def render_hiring_page():
                     file_path = os.path.join(TEMPLATE_DIR, file_name)
                     processed_stream = process_docx(file_path, replacements_data)
 
-                    # --- ส่วนที่เพิ่ม: เปลี่ยนเลขพัสดุในชื่อไฟล์ปลายทาง ---
                     new_filename = file_name
                     if parcel_no.strip():
-                        # เปลี่ยนแพตเทิร์น ตัวเลข-ตัวเลข (เช่น 317-69) ในชื่อไฟล์ เป็นเลขพัสดุใหม่
                         new_filename = re.sub(r"\d+-\d+", parcel_no.strip(), file_name)
 
                     zip_file.writestr(
