@@ -1,5 +1,6 @@
 import streamlit as st
-from docx_processor import arabic_to_thai_num  # 👈 เติม x ถ้าชื่อไฟล์จริงคือ docx_processor.py
+# แก้บรรทัดนี้ใน offer_components.py
+from doc_processor import to_thai_num
 
 
 def render_person_inputs(
@@ -56,8 +57,8 @@ def render_person_inputs(
 
         pos_index = pos_options.index(default_pos) if default_pos in pos_options else 0
 
-        # แปลงตัวเลือกตำแหน่งทั้งหมดใน pos_options ให้เป็นเลขไทย
-        pos_options = [arabic_to_thai_num(opt) for opt in pos_options]
+        # เปลี่ยนจาก arabic_to_thai_num เป็น to_thai_num
+        pos_options = [to_thai_num(opt) for opt in pos_options]
 
         position = st.selectbox(
             f"ตำแหน่ง ({label_title})",
