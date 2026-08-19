@@ -103,7 +103,7 @@ def render_purchase_page():
 
     with col1:
         project_name = st.text_input(
-            "ชื่อโครงการ",
+            "ชื่อโครงการ (ไม่ต้องพิมพ์โครงการนำหน้า)",
             placeholder="ตัวอย่าง: จัดซื้อวัสดุฝึกปฏิบัติการช่างยนต์",
             key="purchase_project_name",
         )
