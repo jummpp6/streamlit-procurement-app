@@ -616,6 +616,9 @@ def render_purchase_page():
         col_prev1, col_prev2 = st.columns([1, 1], gap="medium")
         with col_prev1:
             st.markdown(
+                f"**เลขพัสดุที่ใช้ระบุชื่อไฟล์:** `{parcel_no if parcel_no else 'ไม่ได้ระบุ (ใช้ตามชื่อต้นแบบ)'}`"
+            )
+            st.markdown(
                 f"**โครงการ:** {project_name_thai if project_name else '⚠️ *(ยังไม่ได้กรอก)*'}"
             )
             st.markdown(
@@ -641,10 +644,10 @@ def render_purchase_page():
 
         with col_prev2:
             st.markdown(
-                f"**เลขพัสดุที่ใช้ระบุชื่อไฟล์:** `{parcel_no if parcel_no else 'ไม่ได้ระบุ (ใช้ตามชื่อต้นแบบ)'}`"
+                f"**เลขที่คำสั่ง:** {formatted_doc_no if doc_no_raw else '-'}"
             )
             st.markdown(
-                f"**เลขที่คำสั่ง / ข้อตกลง:** {formatted_doc_no if doc_no_raw else '-'} / {formatted_submit_no if submit_no else '-'}"
+                f"**ข้อตกลง:** {formatted_submit_no if submit_no else '-'}"
             )
             st.markdown(
                 f"**ร้านค้า / ผู้เสนอราคา:** {vendor_name if vendor_name else '⚠️ *(ยังไม่ได้เลือก)*'}"
