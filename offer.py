@@ -328,7 +328,6 @@ def render_purchase_page():
 
         # 1. จัดการเตรียมข้อมูลร้านค้า
         if not df_shops.empty:
-            # ค้นหาคอลัมน์ที่เป็นชื่อร้านค้าแบบอัตโนมัติ
             name_col = next(
                 (
                     col
@@ -356,12 +355,11 @@ def render_purchase_page():
             key="purchase_selected_vendor_name",
         )
 
-        # 3. คำนวณและประมวลผลข้อความที่จะแสดงผล (ทำทันทีที่เลือก)
+        # 3. คำนวณและประมวลผลข้อความที่จะแสดงผล
         c_address, c_phone, c_tax_id = "", "", ""
         display_lines = []
 
         if vendor_name and not df_shops.empty:
-            # ค้นหาแถวข้อมูลที่ตรงกัน
             match = df_shops[
                 df_shops["clean_shop_name"] == str(vendor_name).strip()
             ]
@@ -369,7 +367,6 @@ def render_purchase_page():
             if not match.empty:
                 row = match.iloc[0]
 
-                # ฟังก์ชันดึงค่าฟิลด์แบบรองรับทุกชื่อคอลัมน์
                 def find_val(candidates):
                     for cand in candidates:
                         for c in row.index:
@@ -394,7 +391,6 @@ def render_purchase_page():
                 if c_tax_id:
                     display_lines.append(f"เลขประจำตัวผู้เสียภาษี: {c_tax_id}")
 
-        # กำหนดข้อความสุดท้ายที่จะโชว์
         if display_lines:
             final_display_text = "\n".join(display_lines)
         elif vendor_name:
@@ -404,7 +400,6 @@ def render_purchase_page():
 
         st.markdown("**รายละเอียดร้านค้า**")
 
-        # 4. แสดงผล Text Area (ไม่ใส่ Key ซ้ำ เพื่อบังคับให้ Streamlit วาดใหม่ตามค่า final_display_text ทุกครั้ง)
         st.text_area(
             "รายละเอียดร้านค้า",
             value=final_display_text,
@@ -465,6 +460,9 @@ def render_purchase_page():
     )
 
     # --- ประมวลผลแปลงตัวเลข/วันที่ ---
+    # 🟢 [ข้อ 1] แปลงชื่อโครงการเป็นเลขไทย
+    project_name_thai = to_thai_num(project_name)
+
     formatted_budget = format_budget_money(budget, use_thai=use_thai_num)
     formatted_budget_mid = format_budget_money(budgetmid, use_thai=use_thai_num2)
 
@@ -490,7 +488,7 @@ def render_purchase_page():
     budget_with_text_mid = f"{formatted_budget_mid} บาท ({budget_text_mid})"
 
     replacements_data = {
-        "{{PROJECT_NAME}}": project_name,
+        "{{PROJECT_NAME}}": project_name_thai,  # 👈 ใช้ค่าที่แปลงเป็นเลขไทยแล้ว
         "{{BUDGET}}": formatted_budget,
         "{{BUDGET_MID}}": formatted_budget_mid,
         "{{BUDGET_TEXT}}": budget_text,
@@ -621,7 +619,7 @@ def render_purchase_page():
         col_prev1, col_prev2 = st.columns([1, 1], gap="medium")
         with col_prev1:
             st.markdown(
-                f"**โครงการ:** {project_name if project_name else '⚠️ *(ยังไม่ได้กรอก)*'}"
+                f"**โครงการ:** {project_name_thai if project_name else '⚠️ *(ยังไม่ได้กรอก)*'}"
             )
             st.markdown(
                 f"**หน่วยงาน/แผนก:** {department if department else '⚠️ *(ยังไม่ได้กรอก)*'}"
@@ -772,7 +770,7 @@ def render_purchase_page():
             st.download_button(
                 label="📦 ดาวน์โหลดชุดเอกสารจัดซื้อ (.zip)",
                 data=zip_buffer,
-                file_name=f"{project_name}_{parcel_no}.zip",
+                file_name=f"{project_name_thai}_{parcel_no}.zip",
                 mime="application/zip",
                 use_container_width=True,
             )
