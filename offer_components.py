@@ -1,4 +1,5 @@
 import streamlit as st
+from doc_processor import arabic_to_thai_num
 
 
 def render_person_inputs(
