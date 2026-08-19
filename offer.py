@@ -771,9 +771,9 @@ def render_purchase_page():
             )
 
             st.download_button(
-                label="📦 ดาวน์โหลดชุดเอกสารจัดซื้อ (.zip)",
+                label="📦 ดาวน์โหลดชุดเอกสารจัดจ้าง (.zip)",
                 data=zip_buffer,
-                file_name=zip_filename,
+                file_name=f"{project_name}_{parcel_no}.zip",
                 mime="application/zip",
                 use_container_width=True,
             )
