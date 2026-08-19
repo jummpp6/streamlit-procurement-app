@@ -645,6 +645,9 @@ def render_hiring_page():
 
         with col_prev2:
             st.markdown(
+                f"**เลขพัสดุที่ใช้ระบุชื่อไฟล์:** `{parcel_no if parcel_no else 'ไม่ได้ระบุ (ใช้ตามชื่อต้นแบบ)'}`"
+            )
+            st.markdown(
                 f"**เลขที่คำสั่ง / ข้อตกลง:** {formatted_doc_no if doc_no_raw else '-'} / {formatted_submit_no if submit_no else '-'}"
             )
             st.markdown(
