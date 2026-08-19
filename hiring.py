@@ -125,7 +125,7 @@ def render_hiring_page():
 
         item_count_raw = st.text_input(
             "จำนวนรายการ / งาน (เช่น 5, 7, 9 (ไม่ต้องพิมพ์รายการต่อท้าย)",
-            placeholder="ตัวอย่าง: 1 งาน หรือ 3 รายการ",
+            placeholder="ตัวอย่าง: 3",
             key="hiring_item_count",
         )
 
