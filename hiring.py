@@ -124,7 +124,7 @@ def render_hiring_page():
         st.info(f"💡 **แปลงเป็นตัวหนังสืออัตโนมัติ:** {budget_text}")
 
         item_count_raw = st.text_input(
-            "จำนวนรายการ / งาน",
+            "จำนวนรายการ / งาน (เช่น 5, 7, 9 (ไม่ต้องพิมพ์รายการต่อท้าย)",
             placeholder="ตัวอย่าง: 1 งาน หรือ 3 รายการ",
             key="hiring_item_count",
         )
