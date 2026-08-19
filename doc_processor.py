@@ -84,6 +84,11 @@ def replace_text_in_paragraph(paragraph, replacements, default_font="TH SarabunP
 
     first_run = paragraph.runs[0] if paragraph.runs else None
     is_bold = first_run.bold if first_run else False
+    
+    # 1. ดึงขนาดฟอนต์เดิมจาก run แรกมาเก็บไว้ (ถ้าไม่ได้ตั้งไว้ ให้ใช้ค่าเริ่มต้นเป็น 16)
+    original_size = 16
+    if first_run and first_run.font.size:
+        original_size = first_run.font.size.pt
 
     for key, value in replacements.items():
         if key in full_text:
@@ -94,8 +99,9 @@ def replace_text_in_paragraph(paragraph, replacements, default_font="TH SarabunP
 
     if paragraph.runs:
         paragraph.runs[0].text = full_text
+        # 2. ส่งขนาด original_size ที่ดึงมาได้เข้าไปแทนเลข 16
         set_font_exact_16(
-            paragraph.runs[0], default_font, font_size_pt=16, is_bold=is_bold
+            paragraph.runs[0], default_font, font_size_pt=original_size, is_bold=is_bold
         )
 
 
