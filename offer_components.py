@@ -1,5 +1,5 @@
 import streamlit as st
-from doc_processor import arabic_to_thai_num
+from docx_processor import arabic_to_thai_num  # 👈 เติม x ถ้าชื่อไฟล์จริงคือ docx_processor.py
 
 
 def render_person_inputs(
