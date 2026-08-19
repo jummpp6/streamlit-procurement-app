@@ -103,7 +103,7 @@ def render_hiring_page():
 
     with col1:
         project_name = st.text_input(
-            "ชื่อโครงการ",
+            "ชื่อโครงการ (ไม่ต้องพิมพ์โครงการนำหน้า)",
             placeholder="ตัวอย่าง: จ้างซ่อมแซมเครื่องปรับอากาศ",
             key="hiring_project_name",
         )
@@ -161,7 +161,7 @@ def render_hiring_page():
 
     with col2:
         department = st.text_input(
-            "งาน หรือ แผนกวิชาที่จัดทำ",
+            "งาน หรือ แผนกวิชาที่จัดทำ (ใส่งานหรือแผนกวิชาก่อน เช่น งานพัสดุ/แผนกวิชาช่างยนต์)",
             placeholder="ตัวอย่าง: แผนกวิชาช่างยนต์",
             key="hiring_dept",
         )
