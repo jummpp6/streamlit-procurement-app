@@ -2,6 +2,8 @@
 from copy import copy
 import io
 import os
+from google.oauth2.service_account import Credentials
+import gspread
 import openpyxl
 from openpyxl.styles import Alignment, Border, Font, Side
 from openpyxl.utils import get_column_letter
@@ -10,42 +12,59 @@ import pandas as pd
 from pythainlp.util import bahttext
 import streamlit as st
 
+# 🔗 กำหนด Spreadsheet ID ของ Google Sheet
+SPREADSHEET_ID = "1k_hSSdF50uYcRZVffPNh0NfpXvbJFjajlG26SRUpYMs"
 
-def get_only_teacher_names(file_path: str = "data.xlsx") -> list[str]:
-    """ดึงเฉพาะ ชื่อ-สกุล จากไฟล์ข้อมูลครู/บุคลากร"""
+
+def get_gsheet_worksheet(sheet_name="Teachers"):
+    """เชื่อมต่อ Google Sheets ด้วย Service Account ผ่าน gspread"""
+    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+    creds = Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"], scopes=scopes
+    )
+    client = gspread.authorize(creds)
+    sheet = client.open_by_key(SPREADSHEET_ID).worksheet(sheet_name)
+    return sheet
+
+
+@st.cache_data(ttl=60)
+def get_only_teacher_names(file_path: str = "Teachers") -> list[str]:
+    """ดึงรายชื่อผู้รับพัสดุ/ครูจาก Google Sheets"""
     default_names = ["นายสมชาย ใจดี", "นางสาววิภา รักสงบ"]
-
-    target_file = "data.xlsx" if os.path.exists("data.xlsx") else "teachers.xlsx"
-
-    if not os.path.exists(target_file):
-        return default_names
-
     try:
-        xls = pd.ExcelFile(target_file)
-        sheet_to_use = (
-            "Teachers" if "Teachers" in xls.sheet_names else xls.sheet_names[0]
-        )
-        df = pd.read_excel(target_file, sheet_name=sheet_to_use)
+        sheet_name = "Teachers"
+        if isinstance(file_path, str) and file_path.endswith(".xlsx"):
+            sheet_name = "Teachers"
+        elif isinstance(file_path, str) and file_path.strip():
+            sheet_name = file_path
 
-        target_col = None
-        for col in df.columns:
-            if "ชื่อ" in str(col):
-                target_col = col
-                break
+        ws = get_gsheet_worksheet(sheet_name)
+        rows = ws.get_all_values()
 
-        if target_col is None:
-            target_col = df.columns[1] if len(df.columns) > 1 else df.columns[0]
+        clean_names = []
+        if len(rows) > 1:
+            for r in rows[1:]:
+                if len(r) >= 2:
+                    full_name = str(r[1]).strip() if r[1] else ""
+                    if (
+                        full_name
+                        and full_name
+                        not in [
+                            "ชื่อ - สกุล",
+                            "ชื่อ-สกุล",
+                            "ชื่อ",
+                            "ลำดับที่",
+                            "nan",
+                            "None",
+                        ]
+                        and full_name not in clean_names
+                    ):
+                        clean_names.append(full_name)
 
-        if target_col is not None:
-            names = df[target_col].dropna().astype(str).str.strip().tolist()
-            invalid_values = {"nan", "None", "ชื่อ - สกุล", "ชื่อ-สกุล", "ชื่อ", ""}
-            clean_names = [name for name in names if name not in invalid_values]
-
-            if clean_names:
-                return clean_names
-
+        if clean_names:
+            return clean_names
     except Exception as e:
-        st.error(f"❌ ไม่สามารถอ่านรายชื่อจาก {target_file} ได้: {e}")
+        st.warning(f"⚠️ ไม่สามารถอ่านรายชื่อจาก Google Sheets ได้: {e}")
 
     return default_names
 
@@ -286,7 +305,7 @@ def render_fourcolor_dialog(
         unsafe_allow_html=True,
     )
 
-    receiver_options = get_only_teacher_names("teachers.xlsx")
+    receiver_options = get_only_teacher_names("Teachers")
 
     st.markdown("##### 👤 ข้อมูลผู้รับพัสดุ")
 
@@ -322,7 +341,6 @@ def render_fourcolor_dialog(
         "กรอกรายการสินค้า จำนวน และราคา เพื่อใช้สำหรับสร้างเอกสารแนบสี่สี/คุณลักษณะ"
     )
 
-    # 🟢 กำหนดค่าเริ่มต้นลงใน session_state เพียงครั้งเดียว (ใช้ key เดียวกันกับ data_editor)
     if "fourcolor_items_table" not in st.session_state:
         if default_items is not None and not default_items.empty:
             st.session_state["fourcolor_items_table"] = default_items.copy()
@@ -338,7 +356,6 @@ def render_fourcolor_dialog(
                 ]
             )
 
-    # 🟢 ใช้ st.data_editor โดยผูก key ตามมาตรฐาน Streamlit เพื่อให้จำค่าและซิงค์ทันทีโดยไม่ต้องพิมพ์ซ้ำ
     edited_df = st.data_editor(
         st.session_state["fourcolor_items_table"],
         num_rows="dynamic",
