@@ -1,179 +1,226 @@
+# import datetime
+# import gspread
+# from google.oauth2.service_account import Credentials
+# import pandas as pd
+# import streamlit as st
+
+# # 🔗 กำหนด Spreadsheet ID ของ Google Sheet
+# SPREADSHEET_ID = "1k_hSSdF50uYcRZVffPNh0NfpXvbJFjajlG26SRUpYMs"
+
+
+# # 🟢 0. ฟังก์ชันเชื่อมต่อ Google Sheets ผ่าน Service Account
+# def get_gsheet_worksheet(sheet_name="Shops"):
+#     """เชื่อมต่อ Google Sheets ด้วย Service Account ผ่าน gspread"""
+#     scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+#     # ดึงค่า JSON Credentials จาก Secrets ของ Streamlit
+#     creds = Credentials.from_service_account_info(
+#         st.secrets["gcp_service_account"], scopes=scopes
+#     )
+#     client = gspread.authorize(creds)
+#     sheet = client.open_by_key(SPREADSHEET_ID).worksheet(sheet_name)
+#     return sheet
+
+
+# def clean_text_val(val):
+#     if pd.isna(val) or val is None:
+#         return ""
+#     val_str = str(val).strip()
+#     if val_str.endswith(".0"):
+#         val_str = val_str[:-2]
+#     return "" if val_str.lower() in ["nan", "none"] else val_str
+
+
+# # 🟢 1. โหลดข้อมูลร้านค้า
+# @st.cache_data(ttl=60)  # ตั้ง Cache 1 นาที เพื่อไม่ให้ดึงข้อมูลถี่เกินไป
+# def load_shops_data():
+#     """อ่านข้อมูลร้านค้าจาก Google Sheets ผ่าน gspread"""
+#     try:
+#         ws = get_gsheet_worksheet("Shops")
+#         data = ws.get_all_records()
+#         df = pd.DataFrame(data)
+
+#         # แปลงชื่อคอลัมน์และจัดการข้อมูลให้สะอาด
+#         df.columns = df.columns.str.strip()
+#         for col in ["shop_name", "address", "phone", "tax_id"]:
+#             if col not in df.columns:
+#                 df[col] = ""
+
+#         df = df.dropna(subset=["shop_name"])
+#         df = df[df["shop_name"].astype(str).str.strip() != ""]
+
+#         for col in ["shop_name", "address", "phone", "tax_id"]:
+#             df[col] = df[col].apply(clean_text_val)
+
+#         return df
+#     except Exception as e:
+#         st.error(f"Error loading shops: {e}")
+#         return pd.DataFrame(columns=["shop_name", "address", "phone", "tax_id"])
+
+
+# # 🟢 2. บันทึกข้อมูลร้านค้ากลับลง Google Sheets
+# def save_shops_data(df):
+#     """นำ DataFrame ที่แก้ไข/เพิ่มแล้ว เขียนกลับลง Google Sheets"""
+#     try:
+#         ws = get_gsheet_worksheet("Shops")
+
+#         # ทำความสะอาดข้อมูลก่อนส่งกลับ
+#         df_clean = df[["shop_name", "address", "phone", "tax_id"]].fillna("")
+
+#         # แปลง DataFrame เป็น List รวม Header
+#         header = df_clean.columns.tolist()
+#         values = [header] + df_clean.values.tolist()
+
+#         # ล้าง Sheet เดิม แล้วเขียนข้อมูลใหม่ทั้งหมดลงไป
+#         ws.clear()
+#         ws.update(values)
+
+#         # ล้าง Cache ของ Streamlit เพื่อให้หน้าเว็บโหลดข้อมูลใหม่ทันที
+#         st.cache_data.clear()
+#         return True
+#     except Exception as e:
+#         st.error(f"Error saving shops to Google Sheets: {e}")
+#         return False
+
+
+# # 🟢 3. โหลดข้อมูลครู (ปรับตามตารางล่าสุด: B=ชื่อ-นามสกุล, C=วิทยฐานะ)
+# def load_teacher_data(sheet_name="Teachers"):
+#     """อ่านข้อมูลครูจาก Google Sheets"""
+#     person_dict = {}
+#     person_options = [""]
+#     try:
+#         ws = get_gsheet_worksheet(sheet_name)
+#         rows = ws.get_all_values()
+
+#         # อ่านข้อมูลตั้งแต่แถวที่ 2 เป็นต้นไป (ข้าม Header แถวแรก)
+#         if len(rows) > 1:
+#             for r in rows[1:]:
+#                 if len(r) >= 2:
+#                     # คอลัมน์ B (Index 1) คือ ชื่อ-สกุล
+#                     full_name = str(r[1]).strip() if r[1] else ""
+#                     # คอลัมน์ C (Index 2) คือ วิทยฐานะ
+#                     acad = str(r[2]).strip() if len(r) >= 3 and r[2] else ""
+
+#                     # กรองเอาเฉพาะแถวที่มีข้อมูลชื่อ และไม่ตรงกับหัวข้อตาราง
+#                     if (
+#                         full_name
+#                         and full_name not in ["ชื่อ - สกุล", "ลำดับที่"]
+#                         and full_name not in person_dict
+#                     ):
+#                         person_options.append(full_name)
+#                         person_dict[full_name] = acad
+
+#     except Exception as e:
+#         st.warning(f"Error loading teachers: {e}")
+
+#     return person_options, person_dict
+
+
+# # 🟢 4. คำนวณวันทำการ
+# def add_business_days(start_date, num_days):
+#     """ฟังก์ชันเพิ่มวันทำการ"""
+#     current_date = start_date
+#     added = 0
+#     while added < num_days:
+#         current_date += datetime.timedelta(days=1)
+#         if current_date.weekday() < 5:
+#             added += 1
+#     return current_date
+
 import datetime
 import os
-import gspread
-from google.oauth2.service_account import Credentials
 import pandas as pd
 import streamlit as st
 
-# กำหนด Spreadsheet ID ตามที่คุณต้องการเชื่อมต่อ
-SPREADSHEET_ID = "1k_hSSdF50uYcRZVffPNh0NfpXvbJFjajlG26SRUpYMs"
-
-try:
-    import holidays
-
-    thai_holidays = holidays.TH()
-except ImportError:
-    thai_holidays = []
-
-
-@st.cache_resource
-def get_gspread_client():
-    """เชื่อมต่อ Google Sheets ผ่าน Streamlit Secrets"""
-    scope = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive",
-    ]
-    credentials_dict = dict(st.secrets["gcp_service_account"])
-    creds = Credentials.from_service_account_info(
-        credentials_dict, scopes=scope
-    )
-    client = gspread.authorize(creds)
-    return client
+EXCEL_FILE = r"D:\Project_AutoDoc\data.xlsx"
 
 
 def clean_text_val(val):
-    """ฟังก์ชันช่วยลบ .0 ท้ายข้อความที่เกิดจากการอ่านเลข"""
     if pd.isna(val) or val is None:
         return ""
     val_str = str(val).strip()
     if val_str.endswith(".0"):
         val_str = val_str[:-2]
-    return val_str
+    return "" if val_str.lower() in ["nan", "none"] else val_str
 
 
-@st.cache_data(ttl=600)
+# 🟢 1. โหลดข้อมูลร้านค้าจาก Excel
+@st.cache_data(ttl=5)
 def load_shops_data():
-    """ดึงและจัดระเบียบข้อมูลร้านค้าจาก Google Sheet"""
     try:
-        client = get_gspread_client()
-        # เปิดไฟล์ผ่าน Spreadsheet ID และเลือก Worksheet ชื่อ "shops" (สามารถเปลี่ยนชื่อชีทได้ตามจริง)
-        sheet = client.open_by_key(SPREADSHEET_ID).worksheet("shops")
-        data = sheet.get_all_records()
-        df = pd.DataFrame(data)
+        if not os.path.exists(EXCEL_FILE):
+            return pd.DataFrame(columns=["shop_name", "address", "phone", "tax_id"])
 
-        if df.empty:
-            return pd.DataFrame(
-                columns=["shop_name", "address", "phone", "tax_id"]
-            )
-
-        if "ชื่อร้านค้า" in df.columns or "shop_name" not in df.columns:
-            col_name = (
-                "ชื่อร้านค้า" if "ชื่อร้านค้า" in df.columns else df.columns[0]
-            )
-            col_addr = "ที่อยู่" if "ที่อยู่" in df.columns else df.columns[1]
-
-            df["shop_clean"] = df[col_name].ffill()
-            shops = []
-            for shop, group in df.groupby("shop_clean", sort=False):
-                if pd.isna(shop) or clean_text_val(shop) in [
-                    "nan",
-                    "None",
-                    "",
-                ]:
-                    continue
-
-                address, phone, tax_id = "", "", ""
-                for val in group[col_addr].dropna():
-                    val_str = clean_text_val(val)
-                    if val_str.startswith("เบอร์โทร"):
-                        phone = clean_text_val(
-                            val_str.replace("เบอร์โทร", "", 1)
-                        )
-                    elif val_str.startswith("เลขประจำตัวผู้เสียภาษี"):
-                        tax_id = clean_text_val(
-                            val_str.replace("เลขประจำตัวผู้เสียภาษี", "", 1)
-                        )
-                    elif val_str not in ["nan", "None", "ที่อยู่", ""]:
-                        if not address:
-                            address = val_str
-
-                shops.append(
-                    {
-                        "shop_name": clean_text_val(shop),
-                        "address": address,
-                        "phone": phone,
-                        "tax_id": tax_id,
-                    }
-                )
-
-            return pd.DataFrame(shops)
-
+        df = pd.read_excel(EXCEL_FILE, sheet_name="Shops", dtype=str)
+        df.columns = df.columns.str.strip()
         for col in ["shop_name", "address", "phone", "tax_id"]:
             if col not in df.columns:
                 df[col] = ""
 
         df = df.dropna(subset=["shop_name"])
-        df["shop_name"] = df["shop_name"].apply(clean_text_val)
+        df = df[df["shop_name"].astype(str).str.strip() != ""]
 
-        for col in ["address", "phone", "tax_id"]:
+        for col in ["shop_name", "address", "phone", "tax_id"]:
             df[col] = df[col].apply(clean_text_val)
 
         return df
-
-    except Exception as e:
-        st.error(f"⚠️ ไม่สามารถดึงข้อมูลร้านค้าจาก Google Sheet ได้: {e}")
+    except Exception:
         return pd.DataFrame(columns=["shop_name", "address", "phone", "tax_id"])
 
 
+# 🟢 2. บันทึกข้อมูลร้านค้าลง Excel (ต้องมีฟังก์ชันนี้)
 def save_shops_data(df):
-    """(กรณีต้องการบันทึกกลับ Google Sheet หรือเก็บบน Session)"""
-    # หากต้องการบันทึกกลับไปที่ Google Sheet สามารถเขียนเพิ่มตรงนี้ได้
-    # แต่เบื้องต้นใช้การคืนค่าสถานะจำลองหรือบันทึกลง Sheet โดยตรง
     try:
-        client = get_gspread_client()
-        sheet = client.open_by_key(SPREADSHEET_ID).worksheet("shops")
-        sheet.clear()
-        sheet.update([df.columns.values.tolist()] + df.values.tolist())
+        df_clean = df[["shop_name", "address", "phone", "tax_id"]].fillna("")
+        with pd.ExcelWriter(
+            EXCEL_FILE, engine="openpyxl", mode="a", if_sheet_exists="replace"
+        ) as writer:
+            df_clean.to_excel(writer, sheet_name="Shops", index=False)
+        st.cache_data.clear()
         return True
     except Exception as e:
-        st.error(f"⚠️ ไม่สามารถบันทึกข้อมูลลง Google Sheet ได้: {e}")
+        st.error(f"Error saving shops to Excel: {e}")
         return False
 
 
-def add_business_days(start_date, num_days=5):
-    """ฟังก์ชันคำนวณวันบวกเพิ่ม N วันทำการ"""
+# 🟢 3. โหลดข้อมูลครูจาก Excel
+def load_teacher_data(sheet_name="Teachers"):
+    person_dict = {}
+    person_options = [""]
+    try:
+        if not os.path.exists(EXCEL_FILE):
+            return person_options, person_dict
+
+        xls = pd.ExcelFile(EXCEL_FILE)
+        if sheet_name not in xls.sheet_names:
+            return person_options, person_dict
+
+        df = pd.read_excel(xls, sheet_name=sheet_name, dtype=str)
+
+        for _, row in df.iterrows():
+            if len(row) >= 2:
+                full_name = clean_text_val(row.iloc[1])
+                acad = clean_text_val(row.iloc[2]) if len(row) >= 3 else ""
+
+                if (
+                    full_name
+                    and full_name not in ["ชื่อ - สกุล", "ลำดับที่"]
+                    and full_name not in person_dict
+                ):
+                    person_options.append(full_name)
+                    person_dict[full_name] = acad
+
+    except Exception:
+        pass
+
+    return person_options, person_dict
+
+
+# 🟢 4. คำนวณวันทำการ
+def add_business_days(start_date, num_days):
     current_date = start_date
-    added_days = 0
-    while added_days < num_days:
+    added = 0
+    while added < num_days:
         current_date += datetime.timedelta(days=1)
-        if current_date.weekday() < 5 and current_date not in thai_holidays:
-            added_days += 1
+        if current_date.weekday() < 5:
+            added += 1
     return current_date
-
-
-@st.cache_data(ttl=600)
-def load_teacher_data(
-    file_path="teachers.xlsx",
-):  # 👈 เพิ่มรับ parameter ตรงนี้เพื่อแก้ TypeError
-  """อ่านข้อมูลรายชื่อครูจาก Google Sheet ทุกชีท (ยกเว้นชีทสรุป)"""
-  person_dict = {}
-  person_options = [""]
-
-  try:
-    client = get_gspread_client()
-    spreadsheet = client.open_by_key(SPREADSHEET_ID)
-
-    for sheet in spreadsheet.worksheets():
-      sheet_title = sheet.title
-      if sheet_title in ["สรุป", "สรุปคศ.", "Sheet1"]:
-        continue
-
-      rows = sheet.get_all_values()
-      for row in rows:
-        if len(row) >= 3:
-          fname = str(row[1]).strip() if row[1] else ""
-          lname = str(row[2]).strip() if row[2] else ""
-          acad = str(row[3]).strip() if len(row) >= 4 and row[3] else ""
-
-          if fname and lname and lname not in ["nan", "None", ""]:
-            if not any(fname.startswith(p) for p in ["ข้อมูล", "ลำดับ", "ชื่อ"]):
-              full_name = f"{fname} {lname}".strip()
-              if acad in ["nan", "None", ""]:
-                acad = ""
-              if full_name not in person_dict:
-                person_options.append(full_name)
-                person_dict[full_name] = acad
-  except Exception as e:
-    st.warning(f"⚠️ ไม่สามารถอ่านข้อมูลครูจาก Google Sheet ได้: {e}")
-
-  return person_options, person_dict
