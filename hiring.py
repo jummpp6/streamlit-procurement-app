@@ -274,7 +274,7 @@ def reset_hiring_form():
         "hiring_sub_grant",
         "hiring_sub_budget",
         "hiring_submit_no",
-        "hiring_items_editor",
+        "hiring_items_data",
     ]
     for key in keys_to_clear:
         if key in st.session_state:
@@ -355,9 +355,9 @@ def render_hiring_page():
 
     st.title("🔨 ระบบสร้างเอกสารจัดจ้าง")
 
-    # --- กำหนดค่าเริ่มต้น State สำหรับตารางรายการพัสดุ (ป้องกันข้อมูลหลุด/ต้องกรอกซ้ำ) ---
-    if "hiring_items_editor" not in st.session_state or not isinstance(st.session_state["hiring_items_editor"], pd.DataFrame):
-        st.session_state["hiring_items_editor"] = pd.DataFrame(
+    # --- กำหนดค่าเริ่มต้น State สำหรับข้อมูลตารางพัสดุ (ใช้คีย์จัดการข้อมูลอิสระ ป้องกันข้อผิดพลาด Assignment) ---
+    if "hiring_items_data" not in st.session_state or not isinstance(st.session_state["hiring_items_data"], pd.DataFrame):
+        st.session_state["hiring_items_data"] = pd.DataFrame(
             [
                 {
                     "รายการพัสดุ / รายละเอียดสเปค": "",
@@ -734,33 +734,18 @@ def render_hiring_page():
         "วันที่ตรวจรับ", datetime.date.today(), key="hiring_check_date"
     )
 
-    # --- ส่วนที่ 6: รายละเอียดรายการพัสดุและสเปค (Data Editor เสถียร ไม่รีเซ็ตซ้ำซ้อน) ---
+    # --- ส่วนที่ 6: รายละเอียดรายการพัสดุและสเปค (Data Editor เสถียร ไร้ข้อผิดพลาด) ---
     st.write("")
     st.subheader("📋 6. รายละเอียดรายการพัสดุและสเปค (Item Specifications)")
     st.caption(
         "กำหนดรายการพัสดุหรือขอบเขตงานจ้าง ระบบจะนำไปสร้างไฟล์ Excel ข้อกำหนดการจ้าง (Space) ให้อัตโนมัติเมื่อกดสร้างเอกสาร"
     )
 
-    # ตรวจสอบและแปลงชนิดข้อมูลใน Session State ให้เป็น DataFrame เสมอก่อนแสดงผล
-    if not isinstance(st.session_state.get("hiring_items_editor"), pd.DataFrame):
-        try:
-            st.session_state["hiring_items_editor"] = pd.DataFrame(st.session_state["hiring_items_editor"])
-        except Exception:
-            st.session_state["hiring_items_editor"] = pd.DataFrame(
-                [
-                    {
-                        "รายการพัสดุ / รายละเอียดสเปค": "",
-                        "จำนวน": 1,
-                        "หน่วย": "งาน",
-                    }
-                ]
-            )
-
+    # เรียกใช้ตารางโดยตรงจาก Session State และอัปเดตค่ากลับอย่างปลอดภัยโดยไม่ติดข้อจำกัด Widget Key
     edited_items_df = st.data_editor(
-        st.session_state["hiring_items_editor"],
+        st.session_state["hiring_items_data"],
         num_rows="dynamic",
         use_container_width=True,
-        key="hiring_items_editor",
         column_config={
             "รายการพัสดุ / รายละเอียดสเปค": st.column_config.TextColumn(
                 "รายการพัสดุ / รายละเอียดสเปค / ขอบเขตงาน", width="large"
@@ -769,6 +754,7 @@ def render_hiring_page():
             "หน่วย": st.column_config.TextColumn("หน่วย", width="small"),
         },
     )
+    st.session_state["hiring_items_data"] = edited_items_df
 
     # --- ประมวลผลแปลงตัวเลข/วันที่ ---
     formatted_budget = format_budget_money(budget, use_thai=use_thai_num)
