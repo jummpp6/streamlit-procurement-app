@@ -1,4 +1,4 @@
-# ชื่อ hiring.py
+# -*- coding: utf-8 -*-
 from copy import copy
 import datetime
 import io
@@ -29,6 +29,34 @@ from offer_helpers import (
 from offer_modals import add_shop_modal
 
 
+def ensure_dataframe(data):
+    """🟢 ฟังก์ชันแปลงข้อมูลให้เป็น DataFrame ที่ปลอดภัย 100% ป้องกันข้อผิดพลาดทางตรรกะ"""
+    if isinstance(data, pd.DataFrame):
+        return data.copy()
+    if isinstance(data, list) and len(data) > 0:
+        try:
+            return pd.DataFrame(data)
+        except Exception:
+            pass
+    elif isinstance(data, dict):
+        try:
+            return pd.DataFrame(data)
+        except Exception:
+            try:
+                return pd.DataFrame.from_dict(data, orient="index")
+            except Exception:
+                pass
+    return pd.DataFrame(
+        [
+            {
+                "รายการพัสดุ / รายละเอียดสเปค": "",
+                "จำนวน": 1,
+                "หน่วย": "งาน",
+            }
+        ]
+    )
+
+
 def generate_hiring_space_excel_internal(
     valid_items,
     total_amount,
@@ -53,7 +81,8 @@ def generate_hiring_space_excel_internal(
         ws = wb.active
         ws.title = "รายการพัสดุและสเปค"
         ws.append(["ลำดับ", "รายการพัสดุ / รายละเอียดสเปค", "จำนวน", "หน่วย"])
-        for idx, item in valid_items.reset_index(drop=True).iterrows():
+        safe_valid_items = ensure_dataframe(valid_items)
+        for idx, item in safe_valid_items.reset_index(drop=True).iterrows():
             ws.append(
                 [
                     idx + 1,
@@ -100,6 +129,8 @@ def generate_hiring_space_excel_internal(
     )
     empty_border = Border()
 
+    safe_valid_items = ensure_dataframe(valid_items)
+
     for ws in wb.worksheets:
         start_row = None
         for r in range(1, ws.max_row + 1):
@@ -110,7 +141,7 @@ def generate_hiring_space_excel_internal(
                 break
 
         if start_row:
-            num_items = len(valid_items)
+            num_items = len(safe_valid_items)
             max_cols = 4
 
             template_styles = {}
@@ -128,7 +159,7 @@ def generate_hiring_space_excel_internal(
                     merged_to_shift.append(
                         (rng.min_row, rng.min_col, rng.max_row, rng.max_col)
                     )
-                merged_to_remove.append(str(rng))
+                    merged_to_remove.append(str(rng))
 
             for rng_str in merged_to_remove:
                 ws.unmerge_cells(rng_str)
@@ -148,7 +179,7 @@ def generate_hiring_space_excel_internal(
                 )
 
             current_row = start_row
-            for idx, item in valid_items.reset_index(drop=True).iterrows():
+            for idx, item in safe_valid_items.reset_index(drop=True).iterrows():
                 item_name = str(item.get("รายการพัสดุ / รายละเอียดสเปค", ""))
                 item_qty = item.get("จำนวน", 1)
                 item_unit = str(item.get("หน่วย", "งาน"))
@@ -228,8 +259,8 @@ def generate_hiring_space_excel_internal(
                             if key in val:
                                 cell_obj.value = val.replace(key, target)
 
-    max_col_letter = get_column_letter(ws.max_column)
-    ws.print_area = f"A1:{max_col_letter}{ws.max_row}"
+        max_col_letter = get_column_letter(ws.max_column)
+        ws.print_area = f"A1:{max_col_letter}{ws.max_row}"
 
     output = io.BytesIO()
     wb.save(output)
@@ -238,12 +269,15 @@ def generate_hiring_space_excel_internal(
 
 
 def _extract_shop_info(row):
-    """Helper ดึงข้อมูล ที่อยู่, เบอร์โทร, เลขภาษี จาก row ของ df_shops"""
+    """Helper ดึงข้อมูล ที่อยู่, เบอร์โทร, เลขภาษี จาก row ของ df_shops (รองรับกรณีคอลัมน์ซ้ำ)"""
+
     def find_val(candidates):
         for cand in candidates:
             for c in row.index:
                 if str(c).lower().strip() == cand.lower():
                     val = row[c]
+                    if isinstance(val, pd.Series):
+                        val = val.iloc[0] if not val.empty else ""
                     if pd.notna(val) and str(val).strip().lower() not in [
                         "nan",
                         "none",
@@ -273,29 +307,24 @@ def reset_hiring_form():
         "hiring_sub_grant",
         "hiring_sub_budget",
         "hiring_submit_no",
+        "hiring_items_initialized",
+        "hiring_initial_df",
         "hiring_items_editor",
     ]
     for key in keys_to_clear:
         if key in st.session_state:
-            st.session_state[key] = ""
+            del st.session_state[key]
 
-    st.session_state["hiring_items_df"] = pd.DataFrame(
-        [
-            {
-                "ลำดับ": 1,
-                "รายการพัสดุ / รายละเอียดสเปค": "",
-                "จำนวน": 1,
-                "หน่วย": "งาน",
-            }
-        ]
-    )
     st.toast("ล้างข้อมูลเรียบร้อยแล้ว!", icon="🧹")
 
 
 def on_edit_vendor_change_hiring(df_shops):
+    safe_df_shops = ensure_dataframe(df_shops)
     selected_vendor = st.session_state.get("dialog_edit_hiring_vendor_select")
-    if selected_vendor and not df_shops.empty:
-        match = df_shops[df_shops["clean_shop_name"] == str(selected_vendor).strip()]
+    if selected_vendor and not safe_df_shops.empty:
+        match = safe_df_shops[
+            safe_df_shops["clean_shop_name"] == str(selected_vendor).strip()
+        ]
         if not match.empty:
             addr, phone, tax = _extract_shop_info(match.iloc[0])
             st.session_state["dialog_edit_hiring_vendor_addr"] = addr
@@ -305,20 +334,21 @@ def on_edit_vendor_change_hiring(df_shops):
 
 @st.dialog("✏️ แก้ไขข้อมูลผู้รับจ้าง / ร้านค้า")
 def edit_hiring_shop_dialog(shop_list_options, df_shops):
+    safe_df_shops = ensure_dataframe(df_shops)
     if not shop_list_options:
         st.warning("ยังไม่มีข้อมูลผู้รับจ้างในระบบ")
         return
 
     if "dialog_edit_hiring_vendor_select" not in st.session_state:
         st.session_state["dialog_edit_hiring_vendor_select"] = shop_list_options[0]
-        on_edit_vendor_change_hiring(df_shops)
+        on_edit_vendor_change_hiring(safe_df_shops)
 
     st.selectbox(
         "เลือกชื่อผู้รับจ้าง / บริษัท ที่ต้องการแก้ไข",
         options=shop_list_options,
         key="dialog_edit_hiring_vendor_select",
         on_change=on_edit_vendor_change_hiring,
-        args=(df_shops,),
+        args=(safe_df_shops,),
     )
     st.text_area("ที่อยู่", key="dialog_edit_hiring_vendor_addr")
     st.text_input("เบอร์โทรศัพท์", key="dialog_edit_hiring_vendor_phone")
@@ -334,26 +364,29 @@ def render_hiring_page():
     st.markdown(
         """
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=TH+Sarabun+New:wght@400;600;700&display=swap');
-        @import url('https://fonts.cdnfonts.com/css/th-sarabunpsk');
+            @import url('https://fonts.googleapis.com/css2?family=TH+Sarabun+New:wght@400;600;700&display=swap');
+            @import url('https://fonts.cdnfonts.com/css/th-sarabunpsk');
 
-        header[data-testid="stHeader"] { display: none !important; }
-        .main .block-container { padding-top: 1rem !important; padding-bottom: 2.5rem !important; max-width: 1100px !important; }
-        html, body, [class*="css"], .stMarkdown, .stText, p, label, input, select, textarea, button, span, div { font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', sans-serif !important; font-size: 103.5% !important; }
-        div[data-testid="stHorizontalBlock"] { align-items: flex-start !important; gap: 1rem !important; }
-        .stTextInput label, .stSelectbox label, .stDateInput label, .stRadio label { font-weight: 600 !important; font-size: 105% !important; margin-bottom: 4px !important; color: #334155 !important; }
-        div[data-baseweb="select"] *, div[data-baseweb="input"] input { font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', sans-serif !important; font-size: 105% !important; }
-        div[data-testid="stDateInput"] input { font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', sans-serif !important; font-size: 105% !important; line-height: 44px !important; height: 44px !important; padding-top: 0px !important; padding-bottom: 0px !important; }
-        div[data-baseweb="input"] > div, div[data-baseweb="select"] > div { min-height: 44px !important; height: 44px !important; align-items: center !important; border-radius: 6px !important; background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; }
-        div[data-baseweb="textarea"] > div { min-height: 44px !important; border-radius: 6px !important; background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; }
-        div[data-baseweb="textarea"] textarea { font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', sans-serif !important; font-size: 95% !important; line-height: 1.2 !important; padding: 6px 8px !important; }
-        h1 { font-size: 3.5rem !important; font-weight: 700 !important; margin-top: 0rem !important; margin-bottom: 0.5rem !important; color: #0F172A !important; }
-        h3, .stSubheader { font-size: 2.6rem !important; font-weight: 700 !important; color: #0F172A !important; margin-top: 0.8rem !important; margin-bottom: 0.6rem !important; border-bottom: 2px solid #CBD5E1; padding-bottom: 4px; }
-        h5 { font-size: 1.8rem !important; font-weight: 600 !important; color: #1E293B !important; margin-top: 0.2rem !important; margin-bottom: 0.5rem !important; background-color: #F1F5F9; padding: 4px 10px; border-left: 4px solid #2563EB; border-radius: 0 4px 4px 0; }
-        .stButton > button { padding: 0.5rem 1.5rem !important; font-size: 100% !important; border-radius: 8px !important; font-weight: 600 !important; }
-        .stElementContainer { margin-bottom: 0.4rem !important; }
-        .header-btn-container { margin-top: 25px; }
-        .header-btn-container button { height: 44px !important; min-height: 44px !important; width: 100% !important; }
+            header[data-testid="stHeader"] { display: none !important; }
+            .main .block-container { padding-top: 1rem !important; padding-bottom: 2.5rem !important; max-width: 1100px !important; }
+            html, body, [class*="css"], .stMarkdown, .stText, p, label, input, select, textarea, button, span, div { font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', sans-serif !important; font-size: 103.5% !important; }
+            div[data-testid="stHorizontalBlock"] { align-items: flex-start !important; gap: 1rem !important; }
+            .stTextInput label, .stSelectbox label, .stDateInput label, .stRadio label { font-weight: 600 !important; font-size: 105% !important; margin-bottom: 4px !important; color: #334155 !important; }
+            div[data-baseweb="select"] *, div[data-baseweb="input"] input { font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', sans-serif !important; font-size: 105% !important; }
+            div[data-testid="stDateInput"] input { font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', sans-serif !important; font-size: 105% !important; line-height: 44px !important; height: 44px !important; padding-top: 0px !important; padding-bottom: 0px !important; }
+            div[data-baseweb="input"] > div, div[data-baseweb="select"] > div { min-height: 44px !important; height: 44px !important; align-items: center !important; border-radius: 6px !important; background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; }
+            
+            div[data-baseweb="textarea"] > div { min-height: 44px !important; border-radius: 6px !important; background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; }
+            div[data-baseweb="textarea"] textarea { font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', sans-serif !important; font-size: 95% !important; line-height: 1.2 !important; padding: 6px 8px !important; }
+
+            h1 { font-size: 3.5rem !important; font-weight: 700 !important; margin-top: 0rem !important; margin-bottom: 0.5rem !important; color: #0F172A !important; }
+            h3, .stSubheader { font-size: 2.6rem !important; font-weight: 700 !important; color: #0F172A !important; margin-top: 0.8rem !important; margin-bottom: 0.6rem !important; border-bottom: 2px solid #CBD5E1; padding-bottom: 4px; }
+            h5 { font-size: 1.8rem !important; font-weight: 600 !important; color: #1E293B !important; margin-top: 0.2rem !important; margin-bottom: 0.5rem !important; background-color: #F1F5F9; padding: 4px 10px; border-left: 4px solid #2563EB; border-radius: 0 4px 4px 0; }
+            .stButton > button { padding: 0.5rem 1.5rem !important; font-size: 100% !important; border-radius: 8px !important; font-weight: 600 !important; }
+            .stElementContainer { margin-bottom: 0.4rem !important; }
+            
+            .header-btn-container { margin-top: 25px; }
+            .header-btn-container button { height: 44px !important; min-height: 44px !important; width: 100% !important; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -361,26 +394,17 @@ def render_hiring_page():
 
     st.title("🔨 ระบบสร้างเอกสารจัดจ้าง")
 
-    if "hiring_items_df" not in st.session_state:
-        st.session_state["hiring_items_df"] = pd.DataFrame(
+    if "hiring_items_initialized" not in st.session_state:
+        st.session_state["hiring_items_initialized"] = True
+        st.session_state["hiring_initial_df"] = pd.DataFrame(
             [
                 {
-                    "ลำดับ": 1,
                     "รายการพัสดุ / รายละเอียดสเปค": "",
                     "จำนวน": 1,
                     "หน่วย": "งาน",
                 }
             ]
         )
-    else:
-        df_existing = st.session_state["hiring_items_df"]
-        cols_to_drop = [
-            c
-            for c in df_existing.columns
-            if "ราคา" in str(c) or "price" in str(c).lower()
-        ]
-        if cols_to_drop:
-            st.session_state["hiring_items_df"] = df_existing.drop(columns=cols_to_drop)
 
     col_top1, col_top2 = st.columns([1, 2], gap="medium")
     with col_top1:
@@ -394,12 +418,16 @@ def render_hiring_page():
         else:
             val_init = st.session_state["hiring_parcel_no"]
             if "/" in val_init or "_" in val_init:
-                st.session_state["hiring_parcel_no"] = val_init.replace("/", "-").replace("_", "-")
+                st.session_state["hiring_parcel_no"] = val_init.replace(
+                    "/", "-"
+                ).replace("_", "-")
 
         def update_hiring_parcel():
             val = st.session_state["hiring_parcel_no"]
             if "/" in val or "_" in val:
-                st.session_state["hiring_parcel_no"] = val.replace("/", "-").replace("_", "-")
+                st.session_state["hiring_parcel_no"] = val.replace("/", "-").replace(
+                    "_", "-"
+                )
 
         parcel_no = st.text_input(
             "",
@@ -580,7 +608,7 @@ def render_hiring_page():
     st.write("")
     st.subheader("📋 3. บันทึกรายงานผลการพิจารณา")
 
-    df_shops = load_shops_data()
+    df_shops = ensure_dataframe(load_shops_data())
     shop_list_options = []
     if not df_shops.empty:
         name_col = next(
@@ -744,12 +772,11 @@ def render_hiring_page():
     )
 
     edited_items_df = st.data_editor(
-        st.session_state["hiring_items_df"],
+        st.session_state["hiring_initial_df"],
         num_rows="dynamic",
         use_container_width=True,
         key="hiring_items_editor",
         column_config={
-            "ลำดับ": st.column_config.NumberColumn("ลำดับ", width="small", format="%d"),
             "รายการพัสดุ / รายละเอียดสเปค": st.column_config.TextColumn(
                 "รายการพัสดุ / รายละเอียดสเปค / ขอบเขตงาน", width="large"
             ),
@@ -757,7 +784,6 @@ def render_hiring_page():
             "หน่วย": st.column_config.TextColumn("หน่วย", width="small"),
         },
     )
-    st.session_state["hiring_items_df"] = edited_items_df
 
     formatted_budget = format_budget_money(budget, use_thai=use_thai_num)
     formatted_date = format_thai_date(selected_date, use_thai=use_thai_num)
@@ -1018,7 +1044,7 @@ def render_hiring_page():
             ]
             if buy_list_preview:
                 for item in buy_list_preview:
-                    st.text(f" • {item}")
+                    st.text(f"  • {item}")
             else:
                 st.caption("⚠️ ยังไม่มีการเลือกกรรมการจัดจ้าง")
 
@@ -1031,128 +1057,129 @@ def render_hiring_page():
             ]
             if check_list_preview:
                 for item in check_list_preview:
-                    st.text(f" • {item}")
+                    st.text(f"  • {item}")
             else:
                 st.caption("⚠️ ยังไม่มีการเลือกกรรมการตรวจรับ")
 
-        st.write("")
-        col_action1, col_action2 = st.columns([1, 4], gap="small")
+    st.write("")
+    col_action1, col_action2 = st.columns([1, 4], gap="small")
 
-        with col_action1:
-            st.button(
-                "🗑️ ล้างข้อมูล",
-                use_container_width=True,
-                help="ล้างข้อมูลการกรอกทั้งหมด",
-                key="hiring_reset_btn",
-                on_click=reset_hiring_form,
+    with col_action1:
+        st.button(
+            "🗑️ ล้างข้อมูล",
+            use_container_width=True,
+            help="ล้างข้อมูลการกรอกทั้งหมด",
+            key="hiring_reset_btn",
+            on_click=reset_hiring_form,
+        )
+
+    with col_action2:
+        btn_generate = st.button(
+            "🚀 สร้างเอกสารจัดจ้างทั้งหมด",
+            type="primary",
+            use_container_width=True,
+            key="hiring_submit_btn",
+        )
+
+    if btn_generate:
+        missing_fields = []
+        if not project_name.strip():
+            missing_fields.append("ชื่องานจ้าง / โครงการ")
+        if not budget.strip():
+            missing_fields.append("จำนวนเงิน / วงเงิน")
+        if not department.strip():
+            missing_fields.append("งาน หรือ แผนกวิชา")
+        if not v1["name"]:
+            missing_fields.append("ชื่อบริษัท / ผู้รับจ้าง")
+        if not buy_persons[0][0]:
+            missing_fields.append("ประธาน/กรรมการจัดจ้างคนที่ 1")
+        if not check_persons[0][0]:
+            missing_fields.append("ผู้ตรวจรับ / ประธานกรรมการตรวจรับคนที่ 1")
+
+        if missing_fields:
+            st.error(
+                "❌ กรุณากรอกข้อมูลสำคัญให้ครบถ้วนก่อนสร้างเอกสาร:\n- "
+                + "\n- ".join(missing_fields)
             )
-
-        with col_action2:
-            btn_generate = st.button(
-                "🚀 สร้างเอกสารจัดจ้างทั้งหมด",
-                type="primary",
-                use_container_width=True,
-                key="hiring_submit_btn",
+        elif clean_num > 0 and total_budget_mid_num > clean_num:
+            st.error(
+                f"❌ ไม่สามารถสร้างเอกสารได้เนื่องจาก **ผลรวมราคากลางของผู้รับจ้างสูงกว่าวงเงินงบประมาณ** ({formatted_total_budget_mid} บาท > {formatted_budget} บาท) กรุณาตรวจสอบและแก้ไขข้อมูล"
             )
-
-        if btn_generate:
-            missing_fields = []
-            if not project_name.strip():
-                missing_fields.append("ชื่องานจ้าง / โครงการ")
-            if not budget.strip():
-                missing_fields.append("จำนวนเงิน / วงเงิน")
-            if not department.strip():
-                missing_fields.append("งาน หรือ แผนกวิชา")
-            if not v1["name"]:
-                missing_fields.append("ชื่อบริษัท / ผู้รับจ้าง")
-            if not buy_persons[0][0]:
-                missing_fields.append("ประธาน/กรรมการจัดจ้างคนที่ 1")
-            if not check_persons[0][0]:
-                missing_fields.append("ผู้ตรวจรับ / ประธานกรรมการตรวจรับคนที่ 1")
-
-            if missing_fields:
-                st.error(
-                    "❌ กรุณากรอกข้อมูลสำคัญให้ครบถ้วนก่อนสร้างเอกสาร:\n- "
-                    + "\n- ".join(missing_fields)
-                )
-            elif clean_num > 0 and total_budget_mid_num > clean_num:
-                st.error(
-                    f"❌ ไม่สามารถสร้างเอกสารได้เนื่องจาก **ผลรวมราคากลางของผู้รับจ้างสูงกว่าวงเงินงบประมาณ** ({formatted_total_budget_mid} บาท > {formatted_budget} บาท) กรุณาตรวจสอบและแก้ไขข้อมูล"
-                )
-            elif clean_max_item_count > 0 and total_item_count_num > clean_max_item_count:
-                st.error(
-                    f"❌ ไม่สามารถสร้างเอกสารได้เนื่องจาก **ผลรวมจำนวนรายการของผู้รับจ้าง เกินกว่าจำนวนรายการทั้งหมดที่ระบุไว้** ({formatted_total_item_count} รายการ > {to_thai_num(str(clean_max_item_count))} รายการ) กรุณาตรวจสอบและแก้ไขข้อมูล"
-                )
-            elif not template_files:
-                st.error(
-                    f"ไม่สามารถสร้างเอกสารได้ เนื่องจากไม่มีไฟล์ต้นแบบในโฟลเดอร์ '{TEMPLATE_DIR}'"
-                )
-            else:
-                with st.spinner(
-                    "กำลังประมวลผลเอกสารจัดจ้างและไฟล์ Excel ข้อกำหนดการจ้าง..."
-                ):
-                    zip_buffer = io.BytesIO()
-                    with zipfile.ZipFile(zip_buffer, "w") as zip_file:
-                        for file_name in template_files:
-                            file_path = os.path.join(TEMPLATE_DIR, file_name)
-                            processed_stream = process_docx(
-                                file_path,
-                                replacements_data,
-                                shop_count=shop_count,
-                                buy_count=buy_count,
-                                check_count=check_count,
-                            )
-                            new_filename = (
-                                re.sub(r"\d+-\d+", parcel_no.strip(), file_name)
-                                if parcel_no.strip()
-                                else file_name
-                            )
-                            zip_file.writestr(
-                                f"{new_filename}", processed_stream.getvalue()
-                            )
-
-                        valid_items_df = edited_items_df[
-                            edited_items_df["รายการพัสดุ / รายละเอียดสเปค"]
-                            .astype(str)
-                            .str.strip()
-                            != ""
-                        ].copy()
-
-                        excel_stream = generate_hiring_space_excel_internal(
-                            valid_items=valid_items_df,
-                            total_amount=clean_num if clean_num > 0 else 0.0,
-                            project_name=project_name,
-                            department=department,
-                            budget_type=budget_type_text,
-                            parcel_no=parcel_no,
-                            receiver=buy_persons[0][0] if buy_persons else "",
-                            receiver_sub=buy_persons[1][0] if len(buy_persons) > 1 else "",
+        elif clean_max_item_count > 0 and total_item_count_num > clean_max_item_count:
+            st.error(
+                f"❌ ไม่สามารถสร้างเอกสารได้เนื่องจาก **ผลรวมจำนวนรายการของผู้รับจ้าง เกินกว่าจำนวนรายการทั้งหมดที่ระบุไว้** ({formatted_total_item_count} รายการ > {to_thai_num(str(clean_max_item_count))} รายการ) กรุณาตรวจสอบและแก้ไขข้อมูล"
+            )
+        elif not template_files:
+            st.error(
+                f"ไม่สามารถสร้างเอกสารได้ เนื่องจากไม่มีไฟล์ต้นแบบในโฟลเดอร์ '{TEMPLATE_DIR}'"
+            )
+        else:
+            with st.spinner(
+                "กำลังประมวลผลเอกสารจัดจ้างและไฟล์ Excel ข้อกำหนดการจ้าง..."
+            ):
+                zip_buffer = io.BytesIO()
+                with zipfile.ZipFile(zip_buffer, "w") as zip_file:
+                    for file_name in template_files:
+                        file_path = os.path.join(TEMPLATE_DIR, file_name)
+                        processed_stream = process_docx(
+                            file_path,
+                            replacements_data,
+                            shop_count=shop_count,
+                            buy_count=buy_count,
+                            check_count=check_count,
                         )
-
-                        clean_filename_doc_no = (
-                            parcel_no.strip()
+                        new_filename = (
+                            re.sub(r"\d+-\d+", parcel_no.strip(), file_name)
                             if parcel_no.strip()
-                            else (
-                                doc_no_raw.replace("/", "-") if doc_no_raw else "ไม่ระบุเลข"
-                            )
+                            else file_name
                         )
-                        excel_filename = (
-                            f"เอกสารข้อกำหนดการจ้าง_Space_{clean_filename_doc_no}.xlsx"
+                        zip_file.writestr(
+                            f"{new_filename}", processed_stream.getvalue()
                         )
-                        zip_file.writestr(excel_filename, excel_stream.getvalue())
 
-                    zip_buffer.seek(0)
+                    safe_edited_items = ensure_dataframe(edited_items_df)
+                    valid_items_df = safe_edited_items[
+                        safe_edited_items["รายการพัสดุ / รายละเอียดสเปค"]
+                        .astype(str)
+                        .str.strip()
+                        != ""
+                    ].copy()
 
-                    st.success(
-                        "🎉 สร้างชุดเอกสารจัดจ้างและไฟล์ Excel ข้อกำหนดการจ้างเรียบร้อยแล้ว!"
+                    excel_stream = generate_hiring_space_excel_internal(
+                        valid_items=valid_items_df,
+                        total_amount=clean_num if clean_num > 0 else 0.0,
+                        project_name=project_name,
+                        department=department,
+                        budget_type=budget_type_text,
+                        parcel_no=parcel_no,
+                        receiver=buy_persons[0][0] if buy_persons else "",
+                        receiver_sub=buy_persons[1][0] if len(buy_persons) > 1 else "",
                     )
-                    st.download_button(
-                        label="📦 ดาวน์โหลดชุดเอกสารจัดจ้างและ Excel (.zip)",
-                        data=zip_buffer,
-                        file_name=f"เอกสารจัดจ้าง_{project_name}_{clean_filename_doc_no}.zip",
-                        mime="application/zip",
-                        use_container_width=True,
+
+                    clean_filename_doc_no = (
+                        parcel_no.strip()
+                        if parcel_no.strip()
+                        else (
+                            doc_no_raw.replace("/", "-") if doc_no_raw else "ไม่ระบุเลข"
+                        )
                     )
+                    excel_filename = (
+                        f"เอกสารข้อกำหนดการจ้าง_Space_{clean_filename_doc_no}.xlsx"
+                    )
+                    zip_file.writestr(excel_filename, excel_stream.getvalue())
+
+                zip_buffer.seek(0)
+
+            st.success(
+                "🎉 สร้างชุดเอกสารจัดจ้างและไฟล์ Excel ข้อกำหนดการจ้างเรียบร้อยแล้ว!"
+            )
+            st.download_button(
+                label="📦 ดาวน์โหลดชุดเอกสารจัดจ้างและ Excel (.zip)",
+                data=zip_buffer,
+                file_name=f"เอกสารจัดจ้าง_{project_name}_{clean_filename_doc_no}.zip",
+                mime="application/zip",
+                use_container_width=True,
+            )
 
 
 if __name__ == "__main__":
