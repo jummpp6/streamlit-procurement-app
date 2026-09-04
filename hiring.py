@@ -278,7 +278,7 @@ def reset_hiring_form():
     ]
     for key in keys_to_clear:
         if key in st.session_state:
-            st.session_state[key] = ""
+            del st.session_state[key]
 
     st.session_state["hiring_items_df"] = pd.DataFrame(
         [
@@ -365,7 +365,7 @@ def render_hiring_page():
 
     st.title("🔨 ระบบสร้างเอกสารจัดจ้าง")
 
-    # --- กำหนดค่าเริ่มต้น DataFrame สำหรับรายการพัสดุและสเปค ---
+    # --- กำหนดค่าเริ่มต้น DataFrame สำหรับรายการพัสดุและสเปค (กำหนดครั้งเดียว นิ่งๆ) ---
     if "hiring_items_df" not in st.session_state:
         st.session_state["hiring_items_df"] = pd.DataFrame(
             [
@@ -377,15 +377,6 @@ def render_hiring_page():
                 }
             ]
         )
-    else:
-        df_existing = st.session_state["hiring_items_df"]
-        cols_to_drop = [
-            c
-            for c in df_existing.columns
-            if "ราคา" in str(c) or "price" in str(c).lower()
-        ]
-        if cols_to_drop:
-            st.session_state["hiring_items_df"] = df_existing.drop(columns=cols_to_drop)
 
     # --- แถวบนสุด ---
     col_top1, col_top2 = st.columns([1, 2], gap="medium")
@@ -761,6 +752,7 @@ def render_hiring_page():
         "กำหนดรายการพัสดุหรือขอบเขตงานจ้าง ระบบจะนำไปสร้างไฟล์ Excel ข้อกำหนดการจ้าง (Space) ให้อัตโนมัติเมื่อกดสร้างเอกสาร"
     )
 
+    # ใช้ key="hiring_items_editor" จัดการ State ของตารางอย่างอิสระ ไม่ดึงทับซ้อนซ้ำซ้อน
     edited_items_df = st.data_editor(
         st.session_state["hiring_items_df"],
         num_rows="dynamic",
@@ -775,7 +767,6 @@ def render_hiring_page():
             "หน่วย": st.column_config.TextColumn("หน่วย", width="small"),
         },
     )
-    st.session_state["hiring_items_df"] = edited_items_df
 
     # --- ประมวลผลแปลงตัวเลข/วันที่ ---
     formatted_budget = format_budget_money(budget, use_thai=use_thai_num)
