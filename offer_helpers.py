@@ -25,6 +25,8 @@ def load_shops_data():
     return pd.read_excel("shops.xlsx")
   elif os.path.exists("shops.csv"):
     return pd.read_csv("shops.csv")
+  elif os.path.exists("vendors.xlsx"):
+    return pd.read_excel("vendors.xlsx")
 
   # หากไม่มีไฟล์ใดๆ เลย ให้สร้าง DataFrame เปล่าโครงสร้างเริ่มต้น
   return pd.DataFrame(columns=["shop_name", "address", "phone", "tax_id"])
@@ -38,12 +40,27 @@ def save_shops_data(df):
 
     # สำรองบันทึกไฟล์ Excel ไว้ในเครื่องเพื่อความปลอดภัย
     df.to_excel("shops.xlsx", index=False)
+    df.to_excel("vendors.xlsx", index=False)
     return True
   except Exception as e:
     print(f"Google Sheets save error: {e}")
     try:
       df.to_excel("shops.xlsx", index=False)
+      df.to_excel("vendors.xlsx", index=False)
       return True
     except Exception as local_err:
       print(f"Local save error: {local_err}")
       return False
+
+
+# ==========================================
+# 🔄 Alias Functions (ป้องกัน ImportError กรณีโค้ดเดิมเรียกชื่ออื่น)
+# ==========================================
+def load_vendors_data():
+  """ฟังก์ชันสำรอง กรณีที่โค้ดเก่าเรียกใช้ load_vendors_data"""
+  return load_shops_data()
+
+
+def save_vendors_data(df):
+  """ฟังก์ชันสำรอง กรณีที่โค้ดเก่าเรียกใช้ save_vendors_data"""
+  return save_shops_data(df)
