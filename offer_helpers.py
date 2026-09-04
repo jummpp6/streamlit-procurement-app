@@ -142,38 +142,38 @@ def add_business_days(start_date, num_days=5):
 
 
 @st.cache_data(ttl=600)
-def load_teacher_data():
-    """อ่านข้อมูลรายชื่อครูจาก Google Sheet ทุกชีท (ยกเว้นชีทสรุป)"""
-    person_dict = {}
-    person_options = [""]
+def load_teacher_data(
+    file_path="teachers.xlsx",
+):  # 👈 เพิ่มรับ parameter ตรงนี้เพื่อแก้ TypeError
+  """อ่านข้อมูลรายชื่อครูจาก Google Sheet ทุกชีท (ยกเว้นชีทสรุป)"""
+  person_dict = {}
+  person_options = [""]
 
-    try:
-        client = get_gspread_client()
-        spreadsheet = client.open_by_key(SPREADSHEET_ID)
+  try:
+    client = get_gspread_client()
+    spreadsheet = client.open_by_key(SPREADSHEET_ID)
 
-        for sheet in spreadsheet.worksheets():
-            sheet_title = sheet.title
-            if sheet_title in ["สรุป", "สรุปคศ.", "Sheet1"]:
-                continue
+    for sheet in spreadsheet.worksheets():
+      sheet_title = sheet.title
+      if sheet_title in ["สรุป", "สรุปคศ.", "Sheet1"]:
+        continue
 
-            rows = sheet.get_all_values()
-            for row in rows:
-                if len(row) >= 3:
-                    fname = str(row[1]).strip() if row[1] else ""
-                    lname = str(row[2]).strip() if row[2] else ""
-                    acad = str(row[3]).strip() if len(row) >= 4 and row[3] else ""
+      rows = sheet.get_all_values()
+      for row in rows:
+        if len(row) >= 3:
+          fname = str(row[1]).strip() if row[1] else ""
+          lname = str(row[2]).strip() if row[2] else ""
+          acad = str(row[3]).strip() if len(row) >= 4 and row[3] else ""
 
-                    if fname and lname and lname not in ["nan", "None", ""]:
-                        if not any(
-                            fname.startswith(p) for p in ["ข้อมูล", "ลำดับ", "ชื่อ"]
-                        ):
-                            full_name = f"{fname} {lname}".strip()
-                            if acad in ["nan", "None", ""]:
-                                acad = ""
-                            if full_name not in person_dict:
-                                person_options.append(full_name)
-                                person_dict[full_name] = acad
-    except Exception as e:
-        st.warning(f"⚠️ ไม่สามารถอ่านข้อมูลครูจาก Google Sheet ได้: {e}")
+          if fname and lname and lname not in ["nan", "None", ""]:
+            if not any(fname.startswith(p) for p in ["ข้อมูล", "ลำดับ", "ชื่อ"]):
+              full_name = f"{fname} {lname}".strip()
+              if acad in ["nan", "None", ""]:
+                acad = ""
+              if full_name not in person_dict:
+                person_options.append(full_name)
+                person_dict[full_name] = acad
+  except Exception as e:
+    st.warning(f"⚠️ ไม่สามารถอ่านข้อมูลครูจาก Google Sheet ได้: {e}")
 
-    return person_options, person_dict
+  return person_options, person_dict
