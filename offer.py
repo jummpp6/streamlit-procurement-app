@@ -1,3 +1,4 @@
+# ชื่อ offer.py
 import datetime
 import io
 import os
@@ -24,7 +25,6 @@ from offer_modals import add_shop_modal
 
 def _extract_shop_info(row):
     """Helper ดึงข้อมูล ที่อยู่, เบอร์โทร, เลขภาษี จาก row ของ df_shops"""
-
     def find_val(candidates):
         for cand in candidates:
             for c in row.index:
@@ -108,29 +108,26 @@ def render_purchase_page():
     st.markdown(
         """
         <style>
-            @import url('https://fonts.googleapis.com/css2?family=TH+Sarabun+New:wght@400;600;700&display=swap');
-            @import url('https://fonts.cdnfonts.com/css/th-sarabunpsk');
+        @import url('https://fonts.googleapis.com/css2?family=TH+Sarabun+New:wght@400;600;700&display=swap');
+        @import url('https://fonts.cdnfonts.com/css/th-sarabunpsk');
 
-            header[data-testid="stHeader"] { display: none !important; }
-            .main .block-container { padding-top: 1rem !important; padding-bottom: 2.5rem !important; max-width: 1100px !important; }
-            html, body, [class*="css"], .stMarkdown, .stText, p, label, input, select, textarea, button, span, div { font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', sans-serif !important; font-size: 103.5% !important; }
-            div[data-testid="stHorizontalBlock"] { align-items: flex-start !important; gap: 1rem !important; }
-            .stTextInput label, .stSelectbox label, .stDateInput label, .stRadio label { font-weight: 600 !important; font-size: 105% !important; margin-bottom: 4px !important; color: #334155 !important; }
-            div[data-baseweb="select"] *, div[data-baseweb="input"] input { font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', sans-serif !important; font-size: 105% !important; }
-            div[data-testid="stDateInput"] input { font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', sans-serif !important; font-size: 105% !important; line-height: 44px !important; height: 44px !important; padding-top: 0px !important; padding-bottom: 0px !important; }
-            div[data-baseweb="input"] > div, div[data-baseweb="select"] > div { min-height: 44px !important; height: 44px !important; align-items: center !important; border-radius: 6px !important; background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; }
-            
-            div[data-baseweb="textarea"] > div { min-height: 44px !important; border-radius: 6px !important; background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; }
-            div[data-baseweb="textarea"] textarea { font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', sans-serif !important; font-size: 95% !important; line-height: 1.2 !important; padding: 6px 8px !important; }
-
-            h1 { font-size: 3.5rem !important; font-weight: 700 !important; margin-top: 0rem !important; margin-bottom: 0.5rem !important; color: #0F172A !important; }
-            h3, .stSubheader { font-size: 2.6rem !important; font-weight: 700 !important; color: #0F172A !important; margin-top: 0.8rem !important; margin-bottom: 0.6rem !important; border-bottom: 2px solid #CBD5E1; padding-bottom: 4px; }
-            h5 { font-size: 1.8rem !important; font-weight: 600 !important; color: #1E293B !important; margin-top: 0.2rem !important; margin-bottom: 0.5rem !important; background-color: #F1F5F9; padding: 4px 10px; border-left: 4px solid #2563EB; border-radius: 0 4px 4px 0; }
-            .stButton > button { padding: 0.5rem 1.5rem !important; font-size: 100% !important; border-radius: 8px !important; font-weight: 600 !important; }
-            .stElementContainer { margin-bottom: 0.4rem !important; }
-            
-            .header-btn-container { margin-top: 25px; }
-            .header-btn-container button { height: 44px !important; min-height: 44px !important; width: 100% !important; }
+        header[data-testid="stHeader"] { display: none !important; }
+        .main .block-container { padding-top: 1rem !important; padding-bottom: 2.5rem !important; max-width: 1100px !important; }
+        html, body, [class*="css"], .stMarkdown, .stText, p, label, input, select, textarea, button, span, div { font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', sans-serif !important; font-size: 103.5% !important; }
+        div[data-testid="stHorizontalBlock"] { align-items: flex-start !important; gap: 1rem !important; }
+        .stTextInput label, .stSelectbox label, .stDateInput label, .stRadio label { font-weight: 600 !important; font-size: 105% !important; margin-bottom: 4px !important; color: #334155 !important; }
+        div[data-baseweb="select"] *, div[data-baseweb="input"] input { font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', sans-serif !important; font-size: 105% !important; }
+        div[data-testid="stDateInput"] input { font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', sans-serif !important; font-size: 105% !important; line-height: 44px !important; height: 44px !important; padding-top: 0px !important; padding-bottom: 0px !important; }
+        div[data-baseweb="input"] > div, div[data-baseweb="select"] > div { min-height: 44px !important; height: 44px !important; align-items: center !important; border-radius: 6px !important; background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; }
+        div[data-baseweb="textarea"] > div { min-height: 44px !important; border-radius: 6px !important; background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; }
+        div[data-baseweb="textarea"] textarea { font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', sans-serif !important; font-size: 95% !important; line-height: 1.2 !important; padding: 6px 8px !important; }
+        h1 { font-size: 3.5rem !important; font-weight: 700 !important; margin-top: 0rem !important; margin-bottom: 0.5rem !important; color: #0F172A !important; }
+        h3, .stSubheader { font-size: 2.6rem !important; font-weight: 700 !important; color: #0F172A !important; margin-top: 0.8rem !important; margin-bottom: 0.6rem !important; border-bottom: 2px solid #CBD5E1; padding-bottom: 4px; }
+        h5 { font-size: 1.8rem !important; font-weight: 600 !important; color: #1E293B !important; margin-top: 0.2rem !important; margin-bottom: 0.5rem !important; background-color: #F1F5F9; padding: 4px 10px; border-left: 4px solid #2563EB; border-radius: 0 4px 4px 0; }
+        .stButton > button { padding: 0.5rem 1.5rem !important; font-size: 100% !important; border-radius: 8px !important; font-weight: 600 !important; }
+        .stElementContainer { margin-bottom: 0.4rem !important; }
+        .header-btn-container { margin-top: 25px; }
+        .header-btn-container button { height: 44px !important; min-height: 44px !important; width: 100% !important; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -138,7 +135,6 @@ def render_purchase_page():
 
     st.title("🛒 ระบบสร้างเอกสารจัดซื้อ")
 
-    # --- แถวบนสุด ---
     col_top1, col_top2 = st.columns([1, 2], gap="medium")
     with col_top1:
         if st.button("⬅️ กลับหน้าหลัก", use_container_width=True):
@@ -146,23 +142,17 @@ def render_purchase_page():
             st.rerun()
 
     with col_top2:
-        # 🟢 1. กำหนดค่าเริ่มต้นและแปลง / หรือ _ ให้เป็น - ตั้งแต่ก่อนสร้าง widget
         if "purchase_parcel_no" not in st.session_state:
             st.session_state["purchase_parcel_no"] = ""
         else:
             val_init = st.session_state["purchase_parcel_no"]
             if "/" in val_init or "_" in val_init:
-                st.session_state["purchase_parcel_no"] = val_init.replace(
-                    "/", "-"
-                ).replace("_", "-")
+                st.session_state["purchase_parcel_no"] = val_init.replace("/", "-").replace("_", "-")
 
-        # 🟢 2. สร้าง Callback ฟังก์ชันแปลงค่าแบบเรียลไทม์เมื่อมีการเปลี่ยนแปลง
         def update_purchase_parcel():
             val = st.session_state["purchase_parcel_no"]
             if "/" in val or "_" in val:
-                st.session_state["purchase_parcel_no"] = val.replace("/", "-").replace(
-                    "_", "-"
-                )
+                st.session_state["purchase_parcel_no"] = val.replace("/", "-").replace("_", "-")
 
         parcel_no = st.text_input(
             "",
@@ -173,7 +163,6 @@ def render_purchase_page():
 
     TEMPLATE_DIR = "templates"
     os.makedirs(TEMPLATE_DIR, exist_ok=True)
-    # 🟢 แก้ไขบรรทัดดึงไฟล์ให้เรียงลำดับอักขระ (sorted)
     template_files = sorted(
         [
             f
@@ -182,7 +171,6 @@ def render_purchase_page():
         ]
     )
 
-    # --- ส่วนที่ 1: ข้อมูลการจัดซื้อหลัก ---
     st.subheader("📝 1. ข้อมูลการจัดซื้อ (หน้า ส.1)")
     col1, col2 = st.columns([1, 1], gap="large")
 
@@ -267,7 +255,6 @@ def render_purchase_page():
 
     use_thai_num, use_thai_num2 = True, True
 
-    # --- ส่วนที่ 2: คณะกรรมการ ---
     st.write("")
     st.subheader("👥 2. คำสั่งคณะกรรมการจัดซื้อ / ตรวจรับ")
     person_options, person_dict = load_teacher_data("teachers.xlsx")
@@ -286,7 +273,6 @@ def render_purchase_page():
         key="purchase_check_count_select",
     )
 
-    # 1. คณะกรรมการจัดซื้อ
     st.markdown("##### 🛒 คณะกรรมการจัดซื้อ")
     buy_persons = []
     defaults_buy = [
@@ -311,7 +297,6 @@ def render_purchase_page():
                 p = ("", "", "")
             buy_persons.append(p)
 
-    # 2. คณะกรรมการตรวจรับ
     st.markdown("##### 🔍 คณะกรรมการตรวจรับพัสดุ")
     check_persons = []
     check_pos_options = (
@@ -345,7 +330,6 @@ def render_purchase_page():
                 p = ("", "", "")
             check_persons.append(p)
 
-    # --- ส่วนที่ 3: บันทึกรายงานผลการพิจารณา ---
     st.write("")
     st.subheader("📋 3. บันทึกรายงานผลการพิจารณา")
 
@@ -481,7 +465,6 @@ def render_purchase_page():
             )
             vendor_details_list.append((c_addr, c_phone, c_tax))
 
-    # --- ส่วนที่ 4: ใบสั่งซื้อ ---
     st.write("")
     st.write("")
     st.subheader("📄 4. ใบสั่งซื้อ")
@@ -494,14 +477,12 @@ def render_purchase_page():
         "วันที่ใบสั่งซื้อ", value=default_order_date, key="purchase_date_order_input"
     )
 
-    # --- ส่วนที่ 5: ใบตรวจรับการจัดซื้อ ---
     st.write("")
     st.subheader("✅ 5. ใบตรวจรับการจัดซื้อ")
     selected_date4 = st.date_input(
         "วันที่ตรวจรับ", datetime.date.today(), key="purchase_check_date"
     )
 
-    # --- ประมวลผลแปลงตัวเลข/วันที่ ---
     formatted_budget = format_budget_money(budget, use_thai=use_thai_num)
     formatted_date = format_thai_date(selected_date, use_thai=use_thai_num)
     formatted_date2 = format_thai_date(selected_date2, use_thai=use_thai_num)
@@ -577,7 +558,6 @@ def render_purchase_page():
     v_list = [get_vendor_info(i) for i in range(4)]
     v1, v2, v3, v4 = v_list
 
-    # --- คำนวณผลรวม ---
     total_budget_mid_num = sum(v["clean_num_mid"] for v in v_list[:shop_count])
     total_item_count_num = sum(v["clean_cnt_num"] for v in v_list[:shop_count])
 
@@ -599,7 +579,6 @@ def render_purchase_page():
     )
     formatted_project_name = to_thai_num(project_name) if use_thai_num else project_name
 
-    # --- รวบรวมข้อมูล replacement สำหรับ Docx ---
     replacements_data = {
         "{{PROJECT_NAME}}": formatted_project_name,
         "{{BUDGET}}": formatted_budget,
@@ -631,7 +610,6 @@ def render_purchase_page():
         "{{DIRECTOR_INSPECTOR}}": "คณะกรรมการ" if check_count > 1 else "ผู้",
     }
 
-    # เพิ่มข้อมูล ร้านค้า 2, 3, 4 แบบ Dynamic Loop
     for idx, key_suffix in enumerate(["2", "3", "4"], start=1):
         v = v_list[idx]
         replacements_data.update(
@@ -648,7 +626,6 @@ def render_purchase_page():
             }
         )
 
-    # เพิ่มข้อมูล กรรมการจัดซื้อ แบบ Dynamic Loop
     thai_nums = ["๑", "๒", "๓"]
     for idx, (name, acad, pos) in enumerate(buy_persons):
         suf = "" if idx == 0 else str(idx + 1)
@@ -670,7 +647,6 @@ def render_purchase_page():
             }
         )
 
-    # เพิ่มข้อมูล กรรมการตรวจรับ แบบ Dynamic Loop
     for idx, (name, acad, pos) in enumerate(check_persons):
         suf = "" if idx == 0 else str(idx + 1)
         valid = name and (check_count >= idx + 1)
@@ -701,7 +677,6 @@ def render_purchase_page():
             }
         )
 
-    # --- ส่วนที่ 6: ตรวจสอบข้อมูลสรุป (Preview), Validation & Actions ---
     st.write("")
     st.subheader("👁️ 6. ตรวจสอบข้อมูลสรุป (Preview)")
 
@@ -767,7 +742,7 @@ def render_purchase_page():
             ]
             if buy_list_preview:
                 for item in buy_list_preview:
-                    st.text(f"  • {item}")
+                    st.text(f" • {item}")
             else:
                 st.caption("⚠️ ยังไม่มีการเลือกกรรมการจัดซื้อ")
 
@@ -780,99 +755,100 @@ def render_purchase_page():
             ]
             if check_list_preview:
                 for item in check_list_preview:
-                    st.text(f"  • {item}")
+                    st.text(f" • {item}")
             else:
                 st.caption("⚠️ ยังไม่มีการเลือกกรรมการตรวจรับ")
 
-    st.write("")
-    col_action1, col_action2 = st.columns([1, 4], gap="small")
+        st.write("")
+        col_action1, col_action2 = st.columns([1, 4], gap="small")
 
-    with col_action1:
-        st.button(
-            "🗑️ ล้างข้อมูล",
-            use_container_width=True,
-            help="ล้างข้อมูลการกรอกทั้งหมด",
-            key="purchase_reset_btn",
-            on_click=reset_purchase_form,
-        )
-
-    with col_action2:
-        btn_generate = st.button(
-            "🚀 สร้างเอกสารจัดซื้อทั้งหมด",
-            type="primary",
-            use_container_width=True,
-            key="purchase_submit_btn",
-        )
-
-    if btn_generate:
-        missing_fields = []
-        if not project_name.strip():
-            missing_fields.append("ชื่อโครงการ")
-        if not budget.strip():
-            missing_fields.append("จำนวนเงิน / วงเงิน")
-        if not department.strip():
-            missing_fields.append("งาน หรือ แผนกวิชา")
-        if not v1["name"]:
-            missing_fields.append("ชื่อบริษัท / ร้านค้า")
-        if not buy_persons[0][0]:
-            missing_fields.append("ประธาน/กรรมการจัดซื้อคนที่ 1")
-        if not check_persons[0][0]:
-            missing_fields.append("ผู้ตรวจรับ / ประธานกรรมการตรวจรับคนที่ 1")
-
-        if missing_fields:
-            st.error(
-                "❌ กรุณากรอกข้อมูลสำคัญให้ครบถ้วนก่อนสร้างเอกสาร:\n- "
-                + "\n- ".join(missing_fields)
-            )
-        elif clean_num > 0 and total_budget_mid_num > clean_num:
-            st.error(
-                f"❌ ไม่สามารถสร้างเอกสารได้เนื่องจาก **ผลรวมราคากลางของทุกร้านค้าสูงกว่าวงเงินงบประมาณ** ({formatted_total_budget_mid} บาท > {formatted_budget} บาท) กรุณาตรวจสอบและแก้ไขข้อมูล"
-            )
-        elif clean_max_item_count > 0 and total_item_count_num > clean_max_item_count:
-            st.error(
-                f"❌ ไม่สามารถสร้างเอกสารได้เนื่องจาก **ผลรวมจำนวนรายการของทุกร้านค้า เกินกว่าจำนวนรายการทั้งหมดที่ระบุไว้** ({formatted_total_item_count} รายการ > {to_thai_num(str(clean_max_item_count))} รายการ) กรุณาตรวจสอบและแก้ไขข้อมูล"
-            )
-        elif not template_files:
-            st.error(
-                f"ไม่สามารถสร้างเอกสารได้ เนื่องจากไม่มีไฟล์ต้นแบบในโฟลเดอร์ '{TEMPLATE_DIR}'"
-            )
-        else:
-            with st.spinner("กำลังประมวลผลเอกสารจัดซื้อ..."):
-                zip_buffer = io.BytesIO()
-                with zipfile.ZipFile(zip_buffer, "w") as zip_file:
-                    for file_name in template_files:
-                        file_path = os.path.join(TEMPLATE_DIR, file_name)
-                        processed_stream = process_docx(
-                            file_path,
-                            replacements_data,
-                            shop_count=shop_count,
-                            buy_count=buy_count,
-                            check_count=check_count,
-                        )
-                        new_filename = (
-                            re.sub(r"\d+-\d+", parcel_no.strip(), file_name)
-                            if parcel_no.strip()
-                            else file_name
-                        )
-                        zip_file.writestr(
-                            f"{new_filename}", processed_stream.getvalue()
-                        )
-
-                zip_buffer.seek(0)
-
-            st.success("🎉 สร้างเอกสารจัดซื้อทั้งหมดสำเร็จแล้ว!")
-            clean_filename_doc_no = (
-                parcel_no.strip()
-                if parcel_no.strip()
-                else (doc_no_raw.replace("/", "-") if doc_no_raw else "ไม่ระบุเลข")
-            )
-            st.download_button(
-                label="📦 ดาวน์โหลดชุดเอกสารจัดซื้อ (.zip)",
-                data=zip_buffer,
-                file_name=f"เอกสารจัดซื้อ_{project_name}_{clean_filename_doc_no}.zip",
-                mime="application/zip",
+        with col_action1:
+            st.button(
+                "🗑️ ล้างข้อมูล",
                 use_container_width=True,
+                help="ล้างข้อมูลการกรอกทั้งหมด",
+                key="purchase_reset_btn",
+                on_click=reset_purchase_form,
             )
+
+        with col_action2:
+            btn_generate = st.button(
+                "🚀 สร้างเอกสารจัดซื้อทั้งหมด",
+                type="primary",
+                use_container_width=True,
+                key="purchase_submit_btn",
+            )
+
+        if btn_generate:
+            missing_fields = []
+            if not project_name.strip():
+                missing_fields.append("ชื่อโครงการ")
+            if not budget.strip():
+                missing_fields.append("จำนวนเงิน / วงเงิน")
+            if not department.strip():
+                missing_fields.append("งาน หรือ แผนกวิชา")
+            if not v1["name"]:
+                missing_fields.append("ชื่อบริษัท / ร้านค้า")
+            if not buy_persons[0][0]:
+                missing_fields.append("ประธาน/กรรมการจัดซื้อคนที่ 1")
+            if not check_persons[0][0]:
+                missing_fields.append("ผู้ตรวจรับ / ประธานกรรมการตรวจรับคนที่ 1")
+
+            if missing_fields:
+                st.error(
+                    "❌ กรุณากรอกข้อมูลสำคัญให้ครบถ้วนก่อนสร้างเอกสาร:\n- "
+                    + "\n- ".join(missing_fields)
+                )
+            elif clean_num > 0 and total_budget_mid_num > clean_num:
+                st.error(
+                    f"❌ ไม่สามารถสร้างเอกสารได้เนื่องจาก **ผลรวมราคากลางของทุกร้านค้าสูงกว่าวงเงินงบประมาณ** ({formatted_total_budget_mid} บาท > {formatted_budget} บาท) กรุณาตรวจสอบและแก้ไขข้อมูล"
+                )
+            elif clean_max_item_count > 0 and total_item_count_num > clean_max_item_count:
+                st.error(
+                    f"❌ ไม่สามารถสร้างเอกสารได้เนื่องจาก **ผลรวมจำนวนรายการของทุกร้านค้า เกินกว่าจำนวนรายการทั้งหมดที่ระบุไว้** ({formatted_total_item_count} รายการ > {to_thai_num(str(clean_max_item_count))} รายการ) กรุณาตรวจสอบและแก้ไขข้อมูล"
+                )
+            elif not template_files:
+                st.error(
+                    f"ไม่สามารถสร้างเอกสารได้ เนื่องจากไม่มีไฟล์ต้นแบบในโฟลเดอร์ '{TEMPLATE_DIR}'"
+                )
+            else:
+                with st.spinner("กำลังประมวลผลเอกสารจัดซื้อ..."):
+                    zip_buffer = io.BytesIO()
+                    with zipfile.ZipFile(zip_buffer, "w") as zip_file:
+                        for file_name in template_files:
+                            file_path = os.path.join(TEMPLATE_DIR, file_name)
+                            processed_stream = process_docx(
+                                file_path,
+                                replacements_data,
+                                shop_count=shop_count,
+                                buy_count=buy_count,
+                                check_count=check_count,
+                            )
+                            new_filename = (
+                                re.sub(r"\d+-\d+", parcel_no.strip(), file_name)
+                                if parcel_no.strip()
+                                else file_name
+                            )
+                            zip_file.writestr(
+                                f"{new_filename}", processed_stream.getvalue()
+                            )
+
+                    zip_buffer.seek(0)
+
+                    st.success("🎉 สร้างเอกสารจัดซื้อทั้งหมดสำเร็จแล้ว!")
+                    clean_filename_doc_no = (
+                        parcel_no.strip()
+                        if parcel_no.strip()
+                        else (doc_no_raw.replace("/", "-") if doc_no_raw else "ไม่ระบุเลข")
+                    )
+                    st.download_button(
+                        label="📦 ดาวน์โหลดชุดเอกสารจัดซื้อ (.zip)",
+                        data=zip_buffer,
+                        file_name=f"เอกสารจัดซื้อ_{project_name}_{clean_filename_doc_no}.zip",
+                        mime="application/zip",
+                        use_container_width=True,
+                    )
+
     st.write("")
     st.subheader("🖼️ 7. เอกสารสี่สี / คุณลักษณะ")
 
@@ -883,35 +859,29 @@ def render_purchase_page():
                 "**จัดการข้อมูลรายการสินค้าสำหรับออกเอกสารแนบ Space และ Fourcolor**"
             )
 
-        # saved_items = st.session_state.get("sf_items", pd.DataFrame())
-        # if not saved_items.empty:
-        #     st.caption(f"🟢 มีรายการสินค้าพร้อมใช้งาน")
-        # else:
-        #     st.caption("🟡 ยังไม่มีการกรอกรายการสินค้า")
+        with col_fc2:
+            if st.button(
+                "🎨 เปิดตารางกรอกรายการ",
+                type="primary",
+                use_container_width=True,
+                key="btn_open_space_fourcolor",
+            ):
+                rec_1 = check_persons[0][0] if check_persons[0][0] else None
+                rec_2 = (
+                    check_persons[1][0]
+                    if len(check_persons) > 1 and check_persons[1][0]
+                    else None
+                )
 
-    with col_fc2:
-        if st.button(
-            "🎨 เปิดตารางกรอกรายการ",
-            type="primary",
-            use_container_width=True,
-            key="btn_open_space_fourcolor",
-        ):
-            rec_1 = check_persons[0][0] if check_persons[0][0] else None
-            rec_2 = (
-                check_persons[1][0]
-                if len(check_persons) > 1 and check_persons[1][0]
-                else None
-            )
-
-            render_space_fourcolor_dialog(
-                default_receiver=rec_1,
-                default_receiver_sub=rec_2,
-                default_total_amount=clean_num,
-                project_name=project_name,
-                default_parcel_no=parcel_no,
-                department=department,
-                budget_type=budget_type_text,
-            )
+                render_space_fourcolor_dialog(
+                    default_receiver=rec_1,
+                    default_receiver_sub=rec_2,
+                    default_total_amount=clean_num,
+                    project_name=project_name,
+                    default_parcel_no=parcel_no,
+                    department=department,
+                    budget_type=budget_type_text,
+                )
 
 
 if __name__ == "__main__":
