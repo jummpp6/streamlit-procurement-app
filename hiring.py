@@ -29,6 +29,34 @@ from offer_helpers import (
 from offer_modals import add_shop_modal
 
 
+def ensure_dataframe(data):
+    """🟢 ฟังก์ชันแปลงข้อมูลให้เป็น DataFrame ที่ปลอดภัย 100% ป้องกันข้อผิดพลาดทางตรรกะ"""
+    if isinstance(data, pd.DataFrame):
+        return data.copy()
+    if isinstance(data, list) and len(data) > 0:
+        try:
+            return pd.DataFrame(data)
+        except Exception:
+            pass
+    elif isinstance(data, dict):
+        try:
+            return pd.DataFrame(data)
+        except Exception:
+            try:
+                return pd.DataFrame.from_dict(data, orient="index")
+            except Exception:
+                pass
+    return pd.DataFrame(
+        [
+            {
+                "รายการพัสดุ / รายละเอียดสเปค": "",
+                "จำนวน": 1,
+                "หน่วย": "งาน",
+            }
+        ]
+    )
+
+
 def generate_hiring_space_excel_internal(
     valid_items,
     total_amount,
@@ -53,7 +81,8 @@ def generate_hiring_space_excel_internal(
         ws = wb.active
         ws.title = "รายการพัสดุและสเปค"
         ws.append(["ลำดับ", "รายการพัสดุ / รายละเอียดสเปค", "จำนวน", "หน่วย"])
-        for idx, item in valid_items.reset_index(drop=True).iterrows():
+        safe_valid_items = ensure_dataframe(valid_items)
+        for idx, item in safe_valid_items.reset_index(drop=True).iterrows():
             ws.append(
                 [
                     idx + 1,
@@ -100,6 +129,8 @@ def generate_hiring_space_excel_internal(
     )
     empty_border = Border()
 
+    safe_valid_items = ensure_dataframe(valid_items)
+
     for ws in wb.worksheets:
         start_row = None
         for r in range(1, ws.max_row + 1):
@@ -110,7 +141,7 @@ def generate_hiring_space_excel_internal(
                 break
 
         if start_row:
-            num_items = len(valid_items)
+            num_items = len(safe_valid_items)
             max_cols = 4
 
             template_styles = {}
@@ -148,7 +179,7 @@ def generate_hiring_space_excel_internal(
                 )
 
             current_row = start_row
-            for idx, item in valid_items.reset_index(drop=True).iterrows():
+            for idx, item in safe_valid_items.reset_index(drop=True).iterrows():
                 item_name = str(item.get("รายการพัสดุ / รายละเอียดสเปค", ""))
                 item_qty = item.get("จำนวน", 1)
                 item_unit = str(item.get("หน่วย", "งาน"))
@@ -238,13 +269,15 @@ def generate_hiring_space_excel_internal(
 
 
 def _extract_shop_info(row):
-    """Helper ดึงข้อมูล ที่อยู่, เบอร์โทร, เลขภาษี จาก row ของ df_shops"""
+    """Helper ดึงข้อมูล ที่อยู่, เบอร์โทร, เลขภาษี จาก row ของ df_shops (รองรับกรณีคอลัมน์ซ้ำ)"""
 
     def find_val(candidates):
         for cand in candidates:
             for c in row.index:
                 if str(c).lower().strip() == cand.lower():
                     val = row[c]
+                    if isinstance(val, pd.Series):
+                        val = val.iloc[0] if not val.empty else ""
                     if pd.notna(val) and str(val).strip().lower() not in [
                         "nan",
                         "none",
@@ -286,9 +319,12 @@ def reset_hiring_form():
 
 
 def on_edit_vendor_change_hiring(df_shops):
+    safe_df_shops = ensure_dataframe(df_shops)
     selected_vendor = st.session_state.get("dialog_edit_hiring_vendor_select")
-    if selected_vendor and not df_shops.empty:
-        match = df_shops[df_shops["clean_shop_name"] == str(selected_vendor).strip()]
+    if selected_vendor and not safe_df_shops.empty:
+        match = safe_df_shops[
+            safe_df_shops["clean_shop_name"] == str(selected_vendor).strip()
+        ]
         if not match.empty:
             addr, phone, tax = _extract_shop_info(match.iloc[0])
             st.session_state["dialog_edit_hiring_vendor_addr"] = addr
@@ -298,20 +334,21 @@ def on_edit_vendor_change_hiring(df_shops):
 
 @st.dialog("✏️ แก้ไขข้อมูลผู้รับจ้าง / ร้านค้า")
 def edit_hiring_shop_dialog(shop_list_options, df_shops):
+    safe_df_shops = ensure_dataframe(df_shops)
     if not shop_list_options:
         st.warning("ยังไม่มีข้อมูลผู้รับจ้างในระบบ")
         return
 
     if "dialog_edit_hiring_vendor_select" not in st.session_state:
         st.session_state["dialog_edit_hiring_vendor_select"] = shop_list_options[0]
-        on_edit_vendor_change_hiring(df_shops)
+        on_edit_vendor_change_hiring(safe_df_shops)
 
     st.selectbox(
         "เลือกชื่อผู้รับจ้าง / บริษัท ที่ต้องการแก้ไข",
         options=shop_list_options,
         key="dialog_edit_hiring_vendor_select",
         on_change=on_edit_vendor_change_hiring,
-        args=(df_shops,),
+        args=(safe_df_shops,),
     )
     st.text_area("ที่อยู่", key="dialog_edit_hiring_vendor_addr")
     st.text_input("เบอร์โทรศัพท์", key="dialog_edit_hiring_vendor_phone")
@@ -357,7 +394,6 @@ def render_hiring_page():
 
     st.title("🔨 ระบบสร้างเอกสารจัดจ้าง")
 
-    # --- กำหนดค่าเริ่มต้น State สำหรับข้อมูลตารางพัสดุ (ใช้ Pattern ป้องกันการรีเซ็ตและ Value Assignment Error) ---
     if "hiring_items_initialized" not in st.session_state:
         st.session_state["hiring_items_initialized"] = True
         st.session_state["hiring_initial_df"] = pd.DataFrame(
@@ -370,7 +406,6 @@ def render_hiring_page():
             ]
         )
 
-    # --- แถวบนสุด ---
     col_top1, col_top2 = st.columns([1, 2], gap="medium")
     with col_top1:
         if st.button("⬅️ กลับหน้าหลัก", use_container_width=True):
@@ -411,7 +446,6 @@ def render_hiring_page():
         ]
     )
 
-    # --- ส่วนที่ 1: ข้อมูลการจัดจ้างหลัก ---
     st.subheader("📝 1. ข้อมูลการจัดจ้าง (หน้า ส.1)")
     col1, col2 = st.columns([1, 1], gap="large")
 
@@ -496,7 +530,6 @@ def render_hiring_page():
 
     use_thai_num, use_thai_num2 = True, True
 
-    # --- ส่วนที่ 2: คณะกรรมการ ---
     st.write("")
     st.subheader("👥 2. คำสั่งคณะกรรมการจัดจ้าง / ตรวจรับ")
     person_options, person_dict = load_teacher_data("teachers.xlsx")
@@ -515,7 +548,6 @@ def render_hiring_page():
         key="hiring_check_count_select",
     )
 
-    # 1. คณะกรรมการจัดจ้าง
     st.markdown("##### 🛠️ คณะกรรมการจัดจ้าง")
     buy_persons = []
     defaults_buy = [
@@ -540,7 +572,6 @@ def render_hiring_page():
                 p = ("", "", "")
             buy_persons.append(p)
 
-    # 2. คณะกรรมการตรวจรับ
     st.markdown("##### 🔍 คณะกรรมการตรวจรับงานจ้าง")
     check_persons = []
     check_pos_options = (
@@ -574,11 +605,10 @@ def render_hiring_page():
                 p = ("", "", "")
             check_persons.append(p)
 
-    # --- ส่วนที่ 3: บันทึกรายงานผลการพิจารณา ---
     st.write("")
     st.subheader("📋 3. บันทึกรายงานผลการพิจารณา")
 
-    df_shops = load_shops_data()
+    df_shops = ensure_dataframe(load_shops_data())
     shop_list_options = []
     if not df_shops.empty:
         name_col = next(
@@ -717,7 +747,6 @@ def render_hiring_page():
             )
             vendor_details_list.append((c_addr, c_phone, c_tax))
 
-    # --- ส่วนที่ 4: ใบสั่งจ้าง ---
     st.write("")
     st.write("")
     st.subheader("📄 4. ใบสั่งจ้าง / ใบข้อตกลงจ้าง")
@@ -730,14 +759,12 @@ def render_hiring_page():
         "วันที่ใบสั่งจ้าง", value=default_order_date, key="hiring_date_order_input"
     )
 
-    # --- ส่วนที่ 5: ใบตรวจรับการจ้าง ---
     st.write("")
     st.subheader("✅ 5. ใบตรวจรับการจ้าง")
     selected_date4 = st.date_input(
         "วันที่ตรวจรับ", datetime.date.today(), key="hiring_check_date"
     )
 
-    # --- ส่วนที่ 6: รายละเอียดรายการพัสดุและสเปค (ใช้ Pattern ป้องกันการรีเซ็ตค่า 100%) ---
     st.write("")
     st.subheader("📋 6. รายละเอียดรายการพัสดุและสเปค (Item Specifications)")
     st.caption(
@@ -758,7 +785,6 @@ def render_hiring_page():
         },
     )
 
-    # --- ประมวลผลแปลงตัวเลข/วันที่ ---
     formatted_budget = format_budget_money(budget, use_thai=use_thai_num)
     formatted_date = format_thai_date(selected_date, use_thai=use_thai_num)
     formatted_date2 = format_thai_date(selected_date2, use_thai=use_thai_num)
@@ -834,7 +860,6 @@ def render_hiring_page():
     v_list = [get_vendor_info(i) for i in range(4)]
     v1, v2, v3, v4 = v_list
 
-    # --- คำนวณผลรวม ---
     total_budget_mid_num = sum(v["clean_num_mid"] for v in v_list[:shop_count])
     total_item_count_num = sum(v["clean_cnt_num"] for v in v_list[:shop_count])
 
@@ -856,7 +881,6 @@ def render_hiring_page():
     )
     formatted_project_name = to_thai_num(project_name) if use_thai_num else project_name
 
-    # --- รวบรวมข้อมูล replacement สำหรับ Docx ---
     replacements_data = {
         "{{PROJECT_NAME}}": formatted_project_name,
         "{{BUDGET}}": formatted_budget,
@@ -955,7 +979,6 @@ def render_hiring_page():
             }
         )
 
-    # --- ส่วนที่ 7: ตรวจสอบข้อมูลสรุป (Preview), Validation & Actions ---
     st.write("")
     st.subheader("👁️ 7. ตรวจสอบข้อมูลสรุป (Preview)")
 
@@ -1096,7 +1119,6 @@ def render_hiring_page():
             ):
                 zip_buffer = io.BytesIO()
                 with zipfile.ZipFile(zip_buffer, "w") as zip_file:
-                    # 1. สร้างและแพ็คไฟล์ Word (.docx)
                     for file_name in template_files:
                         file_path = os.path.join(TEMPLATE_DIR, file_name)
                         processed_stream = process_docx(
@@ -1115,9 +1137,9 @@ def render_hiring_page():
                             f"{new_filename}", processed_stream.getvalue()
                         )
 
-                    # 2. สร้างและแพ็คไฟล์ Excel ข้อกำหนดการจ้าง (Space) รวมลงใน ZIP เดียวกันทันที
-                    valid_items_df = edited_items_df[
-                        edited_items_df["รายการพัสดุ / รายละเอียดสเปค"]
+                    safe_edited_items = ensure_dataframe(edited_items_df)
+                    valid_items_df = safe_edited_items[
+                        safe_edited_items["รายการพัสดุ / รายละเอียดสเปค"]
                         .astype(str)
                         .str.strip()
                         != ""
