@@ -33,17 +33,18 @@ def edit_address_modal_content(shop_name, c_address, c_phone, c_tax_id):
             clean_tax_val = clean_text_val(new_tax_id)
 
             df_shops = load_shops_data()
-            idx = df_shops[df_shops["shop_name"] == shop_name].index
+            name_col = next((col for col in df_shops.columns if str(col).lower() in ["shop_name", "name", "shopname", "ร้านค้า", "ชื่อร้าน"]), df_shops.columns[0])
+            idx = df_shops[df_shops[name_col].astype(str).str.strip() == str(shop_name).strip()].index
 
             if not idx.empty:
-                df_shops.loc[idx[0], "address"] = new_address
-                df_shops.loc[idx[0], "phone"] = clean_phone_val
-                df_shops.loc[idx[0], "tax_id"] = clean_tax_val
+                df_shops.loc[idx[0], "address" if "address" in df_shops.columns else df_shops.columns[1]] = new_address
+                df_shops.loc[idx[0], "phone" if "phone" in df_shops.columns else df_shops.columns[2]] = clean_phone_val
+                df_shops.loc[idx[0], "tax_id" if "tax_id" in df_shops.columns else df_shops.columns[3]] = clean_tax_val
             else:
                 new_row = pd.DataFrame(
                     [
                         {
-                            "shop_name": shop_name,
+                            name_col: shop_name,
                             "address": new_address,
                             "phone": clean_phone_val,
                             "tax_id": clean_tax_val,
@@ -59,6 +60,8 @@ def edit_address_modal_content(shop_name, c_address, c_phone, c_tax_id):
 
                 st.toast(f"บันทึกข้อมูลของ '{shop_name}' เรียบร้อย!", icon="✅")
                 st.rerun()
+            else:
+                st.error("⚠️ ไม่สามารถบันทึกข้อมูลลง Google Sheets ได้ กรุณาตรวจสอบการเชื่อมต่อ")
 
     with col2:
         if st.button("ยกเลิก", use_container_width=True):
@@ -107,14 +110,16 @@ def add_shop_modal_content():
                 st.error("⚠️ กรุณากรอกชื่อร้านค้า")
             else:
                 df_shops = load_shops_data()
+                name_col = next((col for col in df_shops.columns if str(col).lower() in ["shop_name", "name", "shopname", "ร้านค้า", "ชื่อร้าน"]), df_shops.columns[0])
 
-                if clean_name in df_shops["shop_name"].tolist():
+                existing_names = df_shops[name_col].astype(str).str.strip().tolist()
+                if clean_name in existing_names:
                     st.error(f"⚠️ ร้านค้า '{clean_name}' มีอยู่ในระบบแล้ว!")
                 else:
                     new_row = pd.DataFrame(
                         [
                             {
-                                "shop_name": clean_name,
+                                name_col: clean_name,
                                 "address": new_address,
                                 "phone": clean_phone_val,
                                 "tax_id": clean_tax_val,
@@ -122,17 +127,20 @@ def add_shop_modal_content():
                         ]
                     )
                     df_shops = pd.concat([df_shops, new_row], ignore_index=True)
-
+                    
                     if save_shops_data(df_shops):
                         st.toast(f"เพิ่มร้านค้า '{clean_name}' เรียบร้อย!", icon="✅")
                         st.rerun()
+                    else:
+                        st.error("⚠️ ไม่สามารถบันทึกข้อมูลลง Google Sheets ได้")
 
     with col2:
-        if st.button("ยกเลิก", use_container_width=True):
+        if st.button("ยกเลิกเพิ่มร้าน", use_container_width=True):
             st.rerun()
 
-
 if dialog_decorator:
-    add_shop_modal = dialog_decorator("➕ เพิ่มร้านค้าใหม่")(add_shop_modal_content)
+    add_shop_modal = dialog_decorator("➕ เพิ่มร้านค้าใหม่")(
+        add_shop_modal_content
+    )
 else:
     add_shop_modal = add_shop_modal_content
