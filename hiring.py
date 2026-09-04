@@ -742,6 +742,7 @@ def render_hiring_page():
     )
 
     edited_items_df = st.data_editor(
+        st.session_state["hiring_items_editor"],  # 👈 เติมตัวแปรข้อมูลตรงนี้ครับ
         num_rows="dynamic",
         use_container_width=True,
         key="hiring_items_editor",
