@@ -280,15 +280,6 @@ def reset_hiring_form():
         if key in st.session_state:
             del st.session_state[key]
 
-    st.session_state["hiring_items_df"] = pd.DataFrame(
-        [
-            {
-                "รายการพัสดุ / รายละเอียดสเปค": "",
-                "จำนวน": 1,
-                "หน่วย": "งาน",
-            }
-        ]
-    )
     st.toast("ล้างข้อมูลเรียบร้อยแล้ว!", icon="🧹")
 
 
@@ -364,9 +355,9 @@ def render_hiring_page():
 
     st.title("🔨 ระบบสร้างเอกสารจัดจ้าง")
 
-    # --- กำหนดค่าเริ่มต้น DataFrame สำหรับรายการพัสดุและสเปค (ไม่มีคอลัมน์ลำดับในตารางกรอก) ---
-    if "hiring_items_df" not in st.session_state:
-        st.session_state["hiring_items_df"] = pd.DataFrame(
+    # --- กำหนดค่าเริ่มต้น State สำหรับตารางรายการพัสดุ (ป้องกันข้อมูลหลุด/ต้องกรอกซ้ำ) ---
+    if "hiring_items_editor" not in st.session_state:
+        st.session_state["hiring_items_editor"] = pd.DataFrame(
             [
                 {
                     "รายการพัสดุ / รายละเอียดสเปค": "",
@@ -743,7 +734,7 @@ def render_hiring_page():
         "วันที่ตรวจรับ", datetime.date.today(), key="hiring_check_date"
     )
 
-    # --- ส่วนที่ 6: รายละเอียดรายการพัสดุและสเปค (Data Editor หลัก - ไม่มีคอลัมน์ลำดับ รวดเร็วไม่ติดขัด) ---
+    # --- ส่วนที่ 6: รายละเอียดรายการพัสดุและสเปค (Data Editor เสถียร ไม่รีเซ็ตซ้ำซ้อน) ---
     st.write("")
     st.subheader("📋 6. รายละเอียดรายการพัสดุและสเปค (Item Specifications)")
     st.caption(
@@ -751,7 +742,6 @@ def render_hiring_page():
     )
 
     edited_items_df = st.data_editor(
-        st.session_state["hiring_items_df"],
         num_rows="dynamic",
         use_container_width=True,
         key="hiring_items_editor",
@@ -763,7 +753,6 @@ def render_hiring_page():
             "หน่วย": st.column_config.TextColumn("หน่วย", width="small"),
         },
     )
-    st.session_state["hiring_items_df"] = edited_items_df
 
     # --- ประมวลผลแปลงตัวเลข/วันที่ ---
     formatted_budget = format_budget_money(budget, use_thai=use_thai_num)
@@ -1122,7 +1111,7 @@ def render_hiring_page():
                             f"{new_filename}", processed_stream.getvalue()
                         )
 
-                    # 2. สร้างและแพ็คไฟล์ Excel ข้อกำหนดการจ้าง (Space) รวมลงใน ZIP เดียวกันทันที (รันเลขลำดับใน Excel อัตโนมัติ)
+                    # 2. สร้างและแพ็คไฟล์ Excel ข้อกำหนดการจ้าง (Space) รวมลงใน ZIP เดียวกันทันที
                     valid_items_df = edited_items_df[
                         edited_items_df["รายการพัสดุ / รายละเอียดสเปค"]
                         .astype(str)
