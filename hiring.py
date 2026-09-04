@@ -365,7 +365,7 @@ def render_hiring_page():
 
     st.title("🔨 ระบบสร้างเอกสารจัดจ้าง")
 
-    # --- กำหนดค่าเริ่มต้น DataFrame สำหรับรายการพัสดุและสเปค (กำหนดครั้งเดียว นิ่งๆ) ---
+    # --- กำหนดค่าเริ่มต้น DataFrame สำหรับรายการพัสดุและสเปค ---
     if "hiring_items_df" not in st.session_state:
         st.session_state["hiring_items_df"] = pd.DataFrame(
             [
@@ -745,21 +745,26 @@ def render_hiring_page():
         "วันที่ตรวจรับ", datetime.date.today(), key="hiring_check_date"
     )
 
-    # --- ส่วนที่ 6: รายละเอียดรายการพัสดุและสเปค (Data Editor หลัก) ---
+    # --- ส่วนที่ 6: รายละเอียดรายการพัสดุและสเปค (Data Editor หลัก - รันเลขอัตโนมัติ) ---
     st.write("")
     st.subheader("📋 6. รายละเอียดรายการพัสดุและสเปค (Item Specifications)")
     st.caption(
         "กำหนดรายการพัสดุหรือขอบเขตงานจ้าง ระบบจะนำไปสร้างไฟล์ Excel ข้อกำหนดการจ้าง (Space) ให้อัตโนมัติเมื่อกดสร้างเอกสาร"
     )
 
-    # ใช้ key="hiring_items_editor" จัดการ State ของตารางอย่างอิสระ ไม่ดึงทับซ้อนซ้ำซ้อน
+    # อัปเดตเลขลำดับอัตโนมัติตามแถวปัจจุบันก่อนแสดงผล
+    if "hiring_items_df" in st.session_state and not st.session_state["hiring_items_df"].empty:
+        st.session_state["hiring_items_df"]["ลำดับ"] = range(1, len(st.session_state["hiring_items_df"]) + 1)
+
     edited_items_df = st.data_editor(
         st.session_state["hiring_items_df"],
         num_rows="dynamic",
         use_container_width=True,
         key="hiring_items_editor",
         column_config={
-            "ลำดับ": st.column_config.NumberColumn("ลำดับ", width="small", format="%d"),
+            "ลำดับ": st.column_config.NumberColumn(
+                "ลำดับ", width="small", format="%d", disabled=True
+            ),
             "รายการพัสดุ / รายละเอียดสเปค": st.column_config.TextColumn(
                 "รายการพัสดุ / รายละเอียดสเปค / ขอบเขตงาน", width="large"
             ),
@@ -767,6 +772,12 @@ def render_hiring_page():
             "หน่วย": st.column_config.TextColumn("หน่วย", width="small"),
         },
     )
+
+    # จัดการรีเฟรชเลขลำดับให้อัตโนมัติทันทีที่มีการเพิ่มหรือลบแถว
+    if not edited_items_df.equals(st.session_state["hiring_items_df"]):
+        edited_items_df["ลำดับ"] = range(1, len(edited_items_df) + 1)
+        st.session_state["hiring_items_df"] = edited_items_df
+        st.rerun()
 
     # --- ประมวลผลแปลงตัวเลข/วันที่ ---
     formatted_budget = format_budget_money(budget, use_thai=use_thai_num)
