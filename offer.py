@@ -19,7 +19,12 @@ from doc_processor import (
     to_thai_num,
 )
 from offer_components import render_person_inputs
-from offer_helpers import add_business_days, load_shops_data, load_teacher_data
+from offer_helpers import (
+    add_business_days,
+    load_shops_data,
+    load_teacher_data,
+    save_shops_data,  # 👈 เพิ่มฟังก์ชันบันทึกข้อมูลลง Google Sheets
+)
 from offer_modals import add_shop_modal
 
 
@@ -94,14 +99,44 @@ def edit_shop_dialog(shop_list_options, df_shops):
         on_change=on_edit_vendor_change,
         args=(df_shops,),
     )
-    st.text_area("ที่อยู่", key="dialog_edit_vendor_addr")
-    st.text_input("เบอร์โทรศัพท์", key="dialog_edit_vendor_phone")
-    st.text_input("เลขประจำตัวผู้เสียภาษี", key="dialog_edit_vendor_tax")
+    new_addr = st.text_area("ที่อยู่", key="dialog_edit_vendor_addr")
+    new_phone = st.text_input("เบอร์โทรศัพท์", key="dialog_edit_vendor_phone")
+    new_tax = st.text_input("เลขประจำตัวผู้เสียภาษี", key="dialog_edit_vendor_tax")
 
     if st.button("💾 บันทึกการแก้ไข", type="primary", use_container_width=True):
         selected_vendor = st.session_state.get("dialog_edit_vendor_select")
-        st.success(f"บันทึกการแก้ไขร้านค้า '{selected_vendor}' เรียบร้อยแล้ว")
-        st.rerun()
+        if selected_vendor:
+            name_col = next(
+                (
+                    col
+                    for col in df_shops.columns
+                    if str(col).lower()
+                    in ["shop_name", "name", "shopname", "ร้านค้า", "ชื่อร้าน"]
+                ),
+                df_shops.columns[0],
+            )
+            idx = df_shops[df_shops[name_col].astype(str).str.strip() == str(selected_vendor).strip()].index
+
+            if not idx.empty:
+                for c in df_shops.columns:
+                    c_low = str(c).lower().strip()
+                    if c_low in ["address", "shop_address", "ที่อยู่", "addr"]:
+                        df_shops.loc[idx[0], c] = new_addr
+                    elif c_low in ["phone", "tel", "เบอร์โทร", "เบอร์โทรศัพท์", "telephone"]:
+                        df_shops.loc[idx[0], c] = new_phone
+                    elif c_low in ["tax_id", "taxid", "เลขประจำตัวผู้เสียภาษี", "tax_no", "tax"]:
+                        df_shops.loc[idx[0], c] = new_tax
+
+                if save_shops_data(df_shops):
+                    cache_key = f"disp_vendor_{selected_vendor}"
+                    if cache_key in st.session_state:
+                        del st.session_state[cache_key]
+                    st.success(f"บันทึกการแก้ไขร้านค้า '{selected_vendor}' ลง Google Sheets เรียบร้อยแล้ว")
+                    st.rerun()
+                else:
+                    st.error("⚠️ ไม่สามารถบันทึกข้อมูลลง Google Sheets ได้")
+            else:
+                st.error("⚠️ ไม่พบข้อมูลร้านค้านี้ในระบบ")
 
 
 def render_purchase_page():
