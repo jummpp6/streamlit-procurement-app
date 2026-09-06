@@ -350,14 +350,35 @@ def edit_hiring_shop_dialog(shop_list_options, df_shops):
         on_change=on_edit_vendor_change_hiring,
         args=(safe_df_shops,),
     )
-    st.text_area("ที่อยู่", key="dialog_edit_hiring_vendor_addr")
-    st.text_input("เบอร์โทรศัพท์", key="dialog_edit_hiring_vendor_phone")
-    st.text_input("เลขประจำตัวผู้เสียภาษี", key="dialog_edit_hiring_vendor_tax")
+    new_addr = st.text_area("ที่อยู่", key="dialog_edit_hiring_vendor_addr")
+    new_phone = st.text_input("เบอร์โทรศัพท์", key="dialog_edit_hiring_vendor_phone")
+    new_tax = st.text_input("เลขประจำตัวผู้เสียภาษี", key="dialog_edit_hiring_vendor_tax")
 
     if st.button("💾 บันทึกการแก้ไข", type="primary", use_container_width=True):
         selected_vendor = st.session_state.get("dialog_edit_hiring_vendor_select")
-        st.success(f"บันทึกการแก้ไขผู้รับจ้าง '{selected_vendor}' เรียบร้อยแล้ว")
-        st.rerun()
+        if selected_vendor:
+            name_col = next((col for col in safe_df_shops.columns if str(col).lower() in ["shop_name", "name", "shopname", "ร้านค้า", "ชื่อร้าน"]), safe_df_shops.columns[0])
+            idx = safe_df_shops[safe_df_shops[name_col].astype(str).str.strip() == str(selected_vendor).strip()].index
+
+            if not idx.empty:
+                # อัปเดตข้อมูลลงใน DataFrame ตามชื่อคอลัมน์ที่มีอยู่จริง
+                for c in safe_df_shops.columns:
+                    c_low = str(c).lower().strip()
+                    if c_low in ["address", "shop_address", "ที่อยู่", "addr"]:
+                        safe_df_shops.loc[idx[0], c] = new_addr
+                    elif c_low in ["phone", "tel", "เบอร์โทร", "เบอร์โทรศัพท์", "telephone"]:
+                        safe_df_shops.loc[idx[0], c] = new_phone
+                    elif c_low in ["tax_id", "taxid", "เลขประจำตัวผู้เสียภาษี", "tax_no", "tax"]:
+                        safe_df_shops.loc[idx[0], c] = new_tax
+
+                # บันทึกลง Google Sheets ผ่าน gspread
+                if save_shops_data(safe_df_shops):
+                    st.success(f"บันทึกการแก้ไขผู้รับจ้าง '{selected_vendor}' ลง Google Sheets เรียบร้อยแล้ว")
+                    st.rerun()
+                else:
+                    st.error("⚠️ ไม่สามารถบันทึกข้อมูลลง Google Sheets ได้ กรุณาตรวจสอบการเชื่อมต่อ")
+            else:
+                st.error("⚠️ ไม่พบข้อมูลร้านค้านี้ในระบบ")
 
 
 def render_hiring_page():
