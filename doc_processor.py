@@ -263,34 +263,82 @@ def remove_trailing_empty_paragraphs(doc):
             p_xml.getparent().remove(p_xml)
         else:
             break
-def process_shop_line_blocks(doc, shops_data):
-    """ฟังก์ชันทำซ้ำบล็อกข้อความบรรทัด (เช่น บันทึกสรุปข้อ 1, 2) ตามจำนวนร้านค้าจริง"""
-    if not shops_data or len(shops_data) <= 1:
-        return
+def process_shop_line_blocks(doc, shop_count):
+  """ฟังก์ชันคัดลอกและสร้างบล็อกบรรทัด (Line Block) สำหรับหลายร้านค้าอัตโนมัติ"""
+  if shop_count <= 1:
+    return
 
-    # ค้นหาบล็อก START_SHOP_LINE2 ถึง END_SHOP_LINE2 ใน Body
-    for i in range(2, len(shops_data) + 1):
-        start_tag = f"{{{{START_SHOP_LINE{i}}}}}"
-        end_tag = f"{{{{END_SHOP_LINE{i}}}}}"
+  body = doc.element.body
 
-        # ค้นหาและดึงองค์ประกอบที่อยู่ระหว่างแท็กนี้
-        elements_to_duplicate = []
+  for i in range(2, shop_count + 1):
+    start_tag = f"{{{{START_SHOP_LINE{i}}}}}"
+    end_tag = f"{{{{END_SHOP_LINE{i}}}}}"
+
+    # 1. ค้นหาองค์ประกอบที่อยู่ระหว่าง START_SHOP_LINE1 และ END_SHOP_LINE1 เพื่อนำมาเป็นแม่แบบ (Template)
+    template_elements = []
+    inside = False
+    parent_map = {}
+
+    for element in list(body):
+      text = "".join(element.itertext()) if hasattr(element, "itertext") else ""
+
+      if f"{{{{START_SHOP_LINE1}}}}" in text:
+        inside = True
+        continue
+      if f"{{{{END_SHOP_LINE1}}}}" in text:
         inside = False
-        parent_container = doc.element.body
+        break
+      if inside:
+        template_elements.append(element)
 
-        for element in list(parent_container):
-            text = "".join(element.itertext()) if hasattr(element, "itertext") else ""
-            if start_tag in text:
-                inside = True
-                continue
-            if end_tag in text:
-                inside = False
-                break
-            if inside:
-                elements_to_duplicate.append(element)
+    # 2. หากลุ่มเป้าหมายของร้านที่ i (เช่น START_SHOP_LINE2 ถึง END_SHOP_LINE2) เพื่อแทรกข้อมูลแทนที่
+    target_found = False
+    target_elements = []
+    inside_target = False
 
-        # หากพบบล็อก ให้ทำการคัดลอกและแทนที่ข้อมูลของร้านที่ i เข้าไป
-        # (หมายเหตุ: โค้ดส่วนนี้จะช่วยให้บล็อกของร้านที่ 2, 3 ปรากฏขึ้นมาพร้อมข้อมูลจริง)
+    for element in list(body):
+      text = "".join(element.itertext()) if hasattr(element, "itertext") else ""
+
+      if start_tag in text:
+        inside_target = True
+        target_found = True
+        continue
+      if end_tag in text:
+        inside_target = False
+        break
+      if inside_target:
+        target_elements.append(element)
+
+    # 3. ถ้าพบบล็อกเป้าหมาย ให้ทำการจำลองข้อความจากแม่แบบ (ร้านที่ 1) มาแปลงเลข 1 เป็นเลข i
+    if target_found and template_elements:
+      for element in target_elements:
+        parent = element.getparent()
+        if parent is not None:
+          parent.remove(element)
+
+      # แทรกสำเนาองค์ประกอบ พร้อมเปลี่ยนเลขแท็กให้ตรงกับร้านที่ i
+      insertion_point = None
+      for element in list(body):
+        text = "".join(element.itertext()) if hasattr(element, "itertext") else ""
+        if end_tag in text:
+          insertion_point = element
+          break
+
+      if insertion_point is not None:
+        for template_el in template_elements:
+          new_el = template_el.makecopy()
+          # เปลี่ยนข้อความภายในแท็กจากเลข 1 เป็นเลข i
+          for node in new_el.iterdescendants():
+            if node.text:
+              node.text = (
+                  node.text.replace("SHOP_LINE1", f"SHOP_LINE{i}")
+                  .replace("VENDOR_NAME1", f"VENDOR_NAME{i}")
+                  .replace("PRICE1", f"PRICE{i}")
+                  .replace("BUDGET_WITH_TEXT_MID1", f"BUDGET_WITH_TEXT_MID{i}")
+              )
+          insertion_point.getparent().insert(
+              insertion_point.getparent().index(insertion_point), new_el
+          )
 
 def process_docx(
     file_path,
