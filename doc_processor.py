@@ -1,5 +1,5 @@
 # ==========================================
-# ไฟล์: doc_processor.py (ฉบับสมบูรณ์: ใช้ระบบ Block ครบวงจร)
+# ไฟล์: doc_processor.py (ฉบับสมบูรณ์: ลบบล็อกเกลี้ยง ไม่เหลือบรรทัดว่าง)
 # ==========================================
 import io
 import re
@@ -79,7 +79,7 @@ def set_font_exact_16(run, font_name="TH SarabunPSK", font_size_pt=16, is_bold=N
 def replace_text_in_paragraph(paragraph, replacements, default_font="TH SarabunPSK"):
     full_text = "".join([run.text for run in paragraph.runs])
 
-    # 🟢 ปรับปรุง Regex ให้รองรับการลบ Tag START/END ทุกรูปแบบแม้มีช่องว่างหรือพิมพ์ผิดเพี้ยน
+    # ลบแท็ก START/END ที่อาจหลงเหลือในบรรทัดที่ใช้งาน เพื่อความสะอาด
     full_text = re.sub(r"\{\{.*?_?(START|END)_.*?\}\}", "", full_text)
     full_text = re.sub(r"\{\{.*?START_SHOP\d*\}\}", "", full_text)
     full_text = re.sub(r"\{\{.*?END_SHOP\d*\}\}", "", full_text)
@@ -98,23 +98,6 @@ def replace_text_in_paragraph(paragraph, replacements, default_font="TH SarabunP
                 set_font_exact_16(
                     paragraph.runs[0], default_font, font_size_pt=16, is_bold=is_bold
                 )
-        return
-
-    first_run = paragraph.runs[0] if paragraph.runs else None
-    is_bold = first_run.bold if first_run else False
-
-    for key, value in replacements.items():
-        if key in full_text:
-            full_text = full_text.replace(key, str(value))
-
-    for run in paragraph.runs:
-        run.text = ""
-
-    if paragraph.runs:
-        paragraph.runs[0].text = full_text
-        set_font_exact_16(
-            paragraph.runs[0], default_font, font_size_pt=16, is_bold=is_bold
-        )
         return
 
     first_run = paragraph.runs[0] if paragraph.runs else None
@@ -158,7 +141,7 @@ def remove_row_from_table(table, keywords_to_remove):
 
 
 def remove_block_by_tags(doc, start_tag, end_tag):
-    """ฟังก์ชันลบบล็อกอัจฉริยะ: รองรับทั้งหน้ากระดาษและบล็อกบรรทัด ทั้งใน Body หลักและในตาราง"""
+    """ฟังก์ชันลบบล็อกอัจฉริยะ: รองรับทั้งหน้ากระดาษและบล็อกบรรทัด ทั้งใน Body หลักและในตาราง (ลบทั้งย่อหน้า/แถวไม่ให้เหลือพื้นที่ว่าง)"""
 
     def process_elements(parent_container):
         elements_to_remove = []
@@ -187,7 +170,7 @@ def remove_block_by_tags(doc, start_tag, end_tag):
     # 1. ค้นหาและลบใน Body หลักของเอกสาร
     process_elements(doc.element.body)
 
-    # 2. ค้นหาและลบในตารางทั้งหมด (รวมถึงตารางซ้อนเซลล์) เพื่อให้แน่ใจว่าบล็อกในตารางถูกลบเกลี้ยง
+    # 2. ค้นหาและลบในตารางทั้งหมด (รวมถึงตารางซ้อนเซลล์)
     def check_tables(tbl):
         for row in tbl.rows:
             for cell in row.cells:
@@ -197,40 +180,20 @@ def remove_block_by_tags(doc, start_tag, end_tag):
 
     for table in doc.tables:
         check_tables(table)
-def unwrap_used_line_blocks(doc, shop_count):
-  """ลบบรรทัดที่เป็นแท็ก START/END ของร้านที่ใช้งานจริงทิ้ง เพื่อไม่ให้เหลือบรรทัดว่าง
 
-  และปล่อยให้ข้อความด้านในแสดงผลปกติ
-  """
-  body = doc.element.body
-  for i in range(2, shop_count + 1):
-    start_tag = f"{{{{START_SHOP_LINE{i}}}}}"
-    end_tag = f"{{{{END_SHOP_LINE{i}}}}}"
-
-    elements_to_remove = []
-    for element in list(body):
-      text = "".join(element.itertext()) if hasattr(element, "itertext") else ""
-      if start_tag in text or end_tag in text:
-        elements_to_remove.append(element)
-
-    # ลบเฉพาะบรรทัดแท็กออก ไม่ให้เหลือช่องว่าง
-    for el in elements_to_remove:
-      parent = el.getparent()
-      if parent is not None:
-        parent.remove(el)
 
 def clean_unused_rows(doc, shop_count=1, buy_count=3, check_count=3):
     keywords_to_remove = []
 
-    # 1. เช็กแท็กร้านค้าส่วนเกิน (ใช้ระบบ Block ทั้งแบบหน้ากระดาษ และแบบบรรทัดเฉพาะกิจ)
+    # 1. เช็กแท็กร้านค้าส่วนเกิน (ลบทั้งบล็อกหน้ากระดาษ และบล็อกบรรทัด START/END_SHOP_LINE แบบถอนรากถอนโคน)
     for i in range(shop_count + 1, 5):
         keywords_to_remove.append(f"{{{{VENDOR_NAME{i}}}}}")
         keywords_to_remove.append(f"{{{{VENDOR_NAME_{i}}}}}")
 
-        # ลบบล็อกหน้ากระดาษส่วนเกิน (เช่น ใบสั่งซื้อ, ใบตรวจรับ)
+        # ลบบล็อกหน้ากระดาษส่วนเกิน
         remove_block_by_tags(doc, f"{{{{START_SHOP{i}}}}}", f"{{{{END_SHOP{i}}}}}")
 
-        # ลบบล็อกบรรทัดเฉพาะกิจ (เช่น บันทึกสรุป ที่ครอบด้วย START_SHOP_LINE / END_SHOP_LINE)
+        # ลบบล็อกบรรทัดเฉพาะกิจ (ครอบด้วย START_SHOP_LINE / END_SHOP_LINE)
         remove_block_by_tags(
             doc, f"{{{{START_SHOP_LINE{i}}}}}", f"{{{{END_SHOP_LINE{i}}}}}"
         )
@@ -283,72 +246,44 @@ def remove_trailing_empty_paragraphs(doc):
             p_xml.getparent().remove(p_xml)
         else:
             break
-def process_shop_line_blocks(doc, shop_count):
-  """จัดการบรรทัดร้านค้า (START_SHOP_LINE / END_SHOP_LINE):
 
-  - ถ้าร้านใดเกินกว่าจำนวนที่เลือก (i > shop_count): ลบทิ้งทั้งย่อหน้าทันที
-  - ถ้าร้านใดอยู่ในจำนวนที่เลือก (i <= shop_count): เก็บย่อหน้านั้นไว้รอรับข้อมูล
-  """
-  body = doc.element.body
-
-  for i in range(2, 5):  # ตรวจสอบร้านที่ 2, 3, 4
-    elements_to_remove = []
-    for element in list(body):
-      text = "".join(element.itertext()) if hasattr(element, "itertext") else ""
-      # ตรวจสอบว่าเป็นแท็กของร้านที่ i นี้หรือไม่
-      if (
-          f"SHOP_LINE{i}" in text
-          or f"SHOP{i}_LINE" in text
-          or f"START_SHOP{i}" in text
-      ):
-        if i > shop_count:
-          elements_to_remove.append(element)
-
-    # ลบย่อหน้าที่เกินออกไปเลย ไม่ให้เหลือพื้นที่ว่าง
-    for el in elements_to_remove:
-      parent = el.getparent()
-      if parent is not None:
-        parent.remove(el)
 
 def process_docx(
     file_path, replacements_processed, shop_count=1, buy_count=3, check_count=3
 ):
-  doc = Document(file_path)
+    doc = Document(file_path)
 
-  # 1. จัดการลบบล็อกตารางส่วนเกิน
-  clean_unused_rows(
-      doc, shop_count=shop_count, buy_count=buy_count, check_count=check_count
-  )
+    # 1. จัดการลบบล็อกร้านค้าและตารางส่วนเกินออกทั้งหมด (รวมถึงบรรทัด SHOP_LINE ที่เกินจำนวนที่เลือก)
+    clean_unused_rows(
+        doc, shop_count=shop_count, buy_count=buy_count, check_count=check_count
+    )
 
-  # 2. ลบบรรทัดข้อความของร้านที่ไม่ได้เลือกทิ้งทันที (แบบเรียบง่าย ชัดเจน)
-  process_shop_line_blocks(doc, shop_count)
+    # 2. แทนที่ข้อความในย่อหน้าปกติสำหรับร้านที่แสดงผลอยู่
+    for p in doc.paragraphs:
+        replace_text_in_paragraph(p, replacements_processed)
 
-  # 3. แทนที่ข้อความในย่อหน้าปกติ (ระบบจะช่วยลบแท็ก START/END ที่เหลือ และใส่ข้อมูลจริงให้)
-  for p in doc.paragraphs:
-    replace_text_in_paragraph(p, replacements_processed)
+    # 3. แทนที่ข้อความในตาราง
+    for table in doc.tables:
+        process_table(table, replacements_processed)
 
-  # 4. แทนที่ข้อความในตาราง
-  for table in doc.tables:
-    process_table(table, replacements_processed)
+    # 4. ทำความสะอาด Tag ที่อาจหลงเหลือ
+    remove_remaining_tags(doc)
 
-  # 5. ทำความสะอาด Tag ที่อาจหลงเหลือ
-  remove_remaining_tags(doc)
+    # 5. คลีนย่อหน้าว่างท้ายไฟล์
+    remove_trailing_empty_paragraphs(doc)
 
-  # 6. คลีนย่อหน้าว่างท้ายไฟล์
-  remove_trailing_empty_paragraphs(doc)
+    # 6. ล็อกระยะขอบบน และเคลียร์ Header ไม่ให้ดันระยะขอบ
+    for section in doc.sections:
+        section.top_margin = Cm(1.25)
+        section.header_distance = Cm(0)
 
-  # 7. ล็อกระยะขอบบน และเคลียร์ Header ไม่ให้ดันระยะขอบ
-  for section in doc.sections:
-    section.top_margin = Cm(1.25)
-    section.header_distance = Cm(0)
+        header = section.header
+        for p in header.paragraphs:
+            p.text = ""
+            p.paragraph_format.space_before = Pt(0)
+            p.paragraph_format.space_after = Pt(0)
 
-    header = section.header
-    for p in header.paragraphs:
-      p.text = ""
-      p.paragraph_format.space_before = Pt(0)
-      p.paragraph_format.space_after = Pt(0)
-
-  output = io.BytesIO()
-  doc.save(output)
-  output.seek(0)
-  return output
+    output = io.BytesIO()
+    doc.save(output)
+    output.seek(0)
+    return output
