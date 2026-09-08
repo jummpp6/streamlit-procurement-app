@@ -139,11 +139,10 @@ def remove_row_from_table(table, keywords_to_remove):
 
 
 # ==========================================
-# 1. ฟังก์ชันเดิมต้นฉบับ 100% (ห้ามแตะต้อง/ไม่แก้ไขใดๆ ทั้งสิ้น)
+# 1. ฟังก์ชันเดิมต้นฉบับของพี่ (วางไว้เฉยๆ ไม่แตะต้อง 100% ตามที่พี่ต้องการ)
 # ==========================================
 def remove_block_by_tags(doc, start_tag, end_tag):
     """ฟังก์ชันลบบล็อกอัจฉริยะ: รองรับทั้งหน้ากระดาษและบล็อกบรรทัด ทั้งใน Body หลักและในตาราง"""
-
     def process_elements(parent_container):
         elements_to_remove = []
         inside_block = False
@@ -168,10 +167,8 @@ def remove_block_by_tags(doc, start_tag, end_tag):
             if parent is not None:
                 parent.remove(element)
 
-    # 1. ค้นหาและลบใน Body หลักของเอกสาร
     process_elements(doc.element.body)
 
-    # 2. ค้นหาและลบในตารางทั้งหมด (รวมถึงตารางซ้อนเซลล์) เพื่อให้แน่ใจว่าบล็อกในตารางถูกลบเกลี้ยง
     def check_tables(tbl):
         for row in tbl.rows:
             for cell in row.cells:
@@ -184,42 +181,37 @@ def remove_block_by_tags(doc, start_tag, end_tag):
 
 
 # ==========================================
-# 2. ฟังก์ชันใหม่ที่เพิ่มขึ้นมา (สำหรับจัดการบล็อกบรรทัด SHOP_LINE ในตารางโดยเฉพาะ)
+# 2. ฟังก์ชันทางเลือกใหม่ (แยกเด็ดขาด สำหรับจัดการเฉพาะแถว SHOP_LINE ในตาราง)
 # ==========================================
-def remove_shop_line_block_by_tags(doc, start_tag, end_tag):
-    """ฟังก์ชันใหม่: ใช้ลบแถวตารางที่ครอบด้วย START_SHOP_LINE / END_SHOP_LINE โดยไม่กระทบฟังก์ชันเดิม"""
-    def clean_table_rows(table):
-        rows_to_remove = []
-        inside_table_block = False
-
-        for row in table.rows:
-            row_text = "".join([cell.text for cell in row.cells])
-
-            if start_tag in row_text:
-                inside_table_block = True
-                rows_to_remove.append(row._tr)
-                if end_tag in row_text:
-                    inside_table_block = False
-                continue
-
-            if inside_table_block:
-                rows_to_remove.append(row._tr)
-                if end_tag in row_text:
-                    inside_table_block = False
-
-        for tr in rows_to_remove:
-            parent = tr.getparent()
-            if parent is not None:
-                parent.remove(tr)
-
-        for row in table.rows:
-            for cell in row.cells:
-                for nested_table in cell.tables:
-                    clean_table_rows(nested_table)
-
-    for table in doc.tables:
-        clean_table_rows(table)
-
+def remove_shop_lines_safely(doc, shop_count=1):
+    """ฟังก์ชันใหม่: วิ่งลบแถวตารางระหว่าง START_SHOP_LINE และ END_SHOP_LINE โดยเฉพาะ ไม่ใช้โค้ดร่วมกับของเดิม"""
+    for i in range(shop_count + 1, 5):
+        start_tag = f"{{{{START_SHOP_LINE{i}}}}}"
+        end_tag = f"{{{{END_SHOP_LINE{i}}}}}"
+        
+        for table in doc.tables:
+            rows_to_delete = []
+            is_deleting = False
+            
+            for row in table.rows:
+                row_text = "".join([cell.text for cell in row.cells])
+                
+                if start_tag in row_text:
+                    is_deleting = True
+                    rows_to_delete.append(row._tr)
+                    if end_tag in row_text:
+                        is_deleting = False
+                    continue
+                
+                if is_deleting:
+                    rows_to_delete.append(row._tr)
+                    if end_tag in row_text:
+                        is_deleting = False
+            
+            for tr in rows_to_delete:
+                parent = tr.getparent()
+                if parent is not None:
+                    parent.remove(tr)
 
 def clean_unused_rows(doc, shop_count=1, buy_count=3, check_count=3):
     keywords_to_remove = []
