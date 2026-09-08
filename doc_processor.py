@@ -1,5 +1,5 @@
 # ==========================================
-# ไฟล์: doc_processor.py (อิงตาม doc_processor (1)_3.py ต้นฉบับ พร้อมระบบตรวจจับจำนวนร้านอัติโนมัติ)
+# ไฟล์: doc_processor.py (แยกฟังก์ชันลบบล็อกหน้า และบล็อกบรรทัดชัดเจนตามที่พี่ต้องการ)
 # ==========================================
 import io
 import re
@@ -139,7 +139,34 @@ def remove_row_from_table(table, keywords_to_remove):
 
 
 def remove_block_by_tags(doc, start_tag, end_tag):
-    """ฟังก์ชันลบบล็อกอัจฉริยะ: รองรับทั้งหน้ากระดาษและบล็อกบรรทัด ทั้งใน Body หลักและในตาราง"""
+    """ฟังก์ชันเดิมของพี่: ใช้สำหรับลบบล็อกหน้ากระดาษ (START_SHOP / END_SHOP)"""
+    body = doc.element.body
+    elements_to_remove = []
+    inside_block = False
+
+    for child in list(body):
+        text = "".join(child.itertext()) if hasattr(child, "itertext") else ""
+
+        if start_tag in text:
+            inside_block = True
+            elements_to_remove.append(child)
+            if end_tag in text:
+                inside_block = False
+            continue
+
+        if inside_block:
+            elements_to_remove.append(child)
+            if end_tag in text:
+                inside_block = False
+
+    for element in elements_to_remove:
+        parent = element.getparent()
+        if parent is not None:
+            parent.remove(element)
+
+
+def remove_line_block_by_tags(doc, start_tag, end_tag):
+    """ฟังก์ชันใหม่ที่สร้างเพิ่ม: ใช้สำหรับลบบล็อกบรรทัด (START_SHOP_LINE / END_SHOP_LINE) โดยเฉพาะ รองรับทั้ง Body และในตาราง"""
 
     def process_elements(parent_container):
         elements_to_remove = []
@@ -165,10 +192,10 @@ def remove_block_by_tags(doc, start_tag, end_tag):
             if parent is not None:
                 parent.remove(element)
 
-    # 1. ค้นหาและลบใน Body หลักของเอกสาร
+    # 1. กวาดล้างใน Body หลัก
     process_elements(doc.element.body)
 
-    # 2. ค้นหาและลบในตารางทั้งหมด (รวมถึงตารางซ้อนเซลล์) เพื่อให้แน่ใจว่าบล็อกในตารางถูกลบเกลี้ยง
+    # 2. กวาดล้างในตารางทั้งหมด (เผื่อบล็อกบรรทัดอยู่ในตาราง)
     def check_tables(tbl):
         for row in tbl.rows:
             for cell in row.cells:
@@ -183,25 +210,24 @@ def remove_block_by_tags(doc, start_tag, end_tag):
 def clean_unused_rows(doc, shop_count=1, buy_count=3, check_count=3):
     keywords_to_remove = []
 
-    # 1. เช็กแท็กร้านค้าส่วนเกิน (ใช้ระบบ Block ทั้งแบบหน้ากระดาษ และแบบบรรทัดเฉพาะกิจ)
     for i in range(shop_count + 1, 5):
         keywords_to_remove.append(f"{{{{VENDOR_NAME{i}}}}}")
         keywords_to_remove.append(f"{{{{VENDOR_NAME_{i}}}}}")
 
-        # ลบบล็อกหน้ากระดาษส่วนเกิน (เช่น ใบสั่งซื้อ, ใบตรวจรับ)
+        # 1. ใช้ฟังก์ชันเดิมลบบล็อกหน้ากระดาษ (START_SHOP / END_SHOP)
         remove_block_by_tags(doc, f"{{{{START_SHOP{i}}}}}", f"{{{{END_SHOP{i}}}}}")
 
-        # ลบบล็อกบรรทัดเฉพาะกิจ (เช่น บันทึกสรุป ที่ครอบด้วย START_SHOP_LINE / END_SHOP_LINE)
-        remove_block_by_tags(
+        # 2. ใช้ฟังก์ชันใหม่ลบบล็อกบรรทัด (START_SHOP_LINE / END_SHOP_LINE) โดยเฉพาะ
+        remove_line_block_by_tags(
             doc, f"{{{{START_SHOP_LINE{i}}}}}", f"{{{{END_SHOP_LINE{i}}}}}"
         )
 
-    # 2. เช็กแท็กกรรมการจัดซื้อส่วนเกิน
+    # เช็กแท็กกรรมการจัดซื้อส่วนเกิน
     for i in range(buy_count + 1, 4):
         keywords_to_remove.append(f"{{{{DIRECTOR_NAME_BUY{i}}}}}")
         keywords_to_remove.append(f"{{{{SIGN_LINE_BUY{i}}}}}")
 
-    # 3. เช็กแท็กกรรมการตรวจรับส่วนเกิน
+    # เช็กแท็กกรรมการตรวจรับส่วนเกิน
     for i in range(check_count + 1, 4):
         keywords_to_remove.append(f"{{{{CHECKITEM_NAME{i}}}}}")
         keywords_to_remove.append(f"{{{{SIGN_LINE_CHECK{i}}}}}")
@@ -249,15 +275,9 @@ def remove_trailing_empty_paragraphs(doc):
 def process_docx(
     file_path, replacements_processed, shop_count=1, buy_count=3, check_count=3
 ):
-    # ตรวจหาจำนวนร้านค้าอัตโนมัติจากข้อมูลที่ส่งเข้ามา ป้องกันกรณี shop_count ติดค่า 1 แล้วร้าน 2, 3 หาย
-    for i in [4, 3, 2]:
-        if any(f"VENDOR_NAME{i}" in k or f"BUDGET_MID{i}" in k or f"SUBMIT_NO{i}" in k for k in replacements_processed.keys()):
-            shop_count = max(shop_count, i)
-            break
-
     doc = Document(file_path)
 
-    # 1. จัดการลบบล็อกส่วนเกินทั้งหมด (ทั้งหน้ากระดาษ และบรรทัดเฉพาะกิจ) ด้วยระบบ Block เดียวกัน
+    # 1. จัดการลบบล็อกส่วนเกิน (แยกฟังก์ชันชัดเจนระหว่างหน้ากระดาษและบรรทัด)
     clean_unused_rows(
         doc, shop_count=shop_count, buy_count=buy_count, check_count=check_count
     )
