@@ -361,39 +361,33 @@ def process_shop_line_blocks(doc, shop_count):
           )
 
 def process_docx(
-    file_path,
-    replacements_processed,
-    shop_count=1,
-    buy_count=3,
-    check_count=3,
-    shops_data=None,
+    file_path, replacements_processed, shop_count=1, buy_count=3, check_count=3
 ):
   doc = Document(file_path)
 
-  # 0. หากมีข้อมูลหลายร้านค้า ให้จัดการทำซ้ำบล็อกบรรทัดรอกไว้ก่อน
-  if shops_data:
-    process_shop_line_blocks(doc, shops_data)
-
-  # 1. จัดการลบบล็อกส่วนเกินทั้งหมด
+  # 1. จัดการลบบล็อกส่วนเกิน (กรณีเลือกจำนวนร้านน้อยกว่าที่มี)
   clean_unused_rows(
       doc, shop_count=shop_count, buy_count=buy_count, check_count=check_count
   )
 
-  # 2. แทนที่ข้อความในย่อหน้าปกติ
+  # 2. แกะแท็ก START/END ของร้านที่เลือกออก เพื่อให้ข้อความข้างในแสดงผลและไม่เหลือบรรทัดว่าง
+  unwrap_used_line_blocks(doc, shop_count)
+
+  # 3. แทนที่ข้อความในย่อหน้าปกติ
   for p in doc.paragraphs:
     replace_text_in_paragraph(p, replacements_processed)
 
-  # 3. แทนที่ข้อความในตาราง
+  # 4. แทนที่ข้อความในตาราง
   for table in doc.tables:
     process_table(table, replacements_processed)
 
-  # 4. ทำความสะอาด Tag ที่อาจหลงเหลือ
+  # 5. ทำความสะอาด Tag ที่อาจหลงเหลือ
   remove_remaining_tags(doc)
 
-  # 5. คลีนย่อหน้าว่างท้ายไฟล์
+  # 6. คลีนย่อหน้าว่างท้ายไฟล์
   remove_trailing_empty_paragraphs(doc)
 
-  # 6. ล็อกระยะขอบบน และเคลียร์ Header ไม่ให้ดันระยะขอบ
+  # 7. ล็อกระยะขอบบน และเคลียร์ Header ไม่ให้ดันระยะขอบ
   for section in doc.sections:
     section.top_margin = Cm(1.25)
     section.header_distance = Cm(0)
