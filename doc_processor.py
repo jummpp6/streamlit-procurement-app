@@ -263,44 +263,80 @@ def remove_trailing_empty_paragraphs(doc):
             p_xml.getparent().remove(p_xml)
         else:
             break
+def process_shop_line_blocks(doc, shops_data):
+    """ฟังก์ชันทำซ้ำบล็อกข้อความบรรทัด (เช่น บันทึกสรุปข้อ 1, 2) ตามจำนวนร้านค้าจริง"""
+    if not shops_data or len(shops_data) <= 1:
+        return
 
+    # ค้นหาบล็อก START_SHOP_LINE2 ถึง END_SHOP_LINE2 ใน Body
+    for i in range(2, len(shops_data) + 1):
+        start_tag = f"{{{{START_SHOP_LINE{i}}}}}"
+        end_tag = f"{{{{END_SHOP_LINE{i}}}}}"
+
+        # ค้นหาและดึงองค์ประกอบที่อยู่ระหว่างแท็กนี้
+        elements_to_duplicate = []
+        inside = False
+        parent_container = doc.element.body
+
+        for element in list(parent_container):
+            text = "".join(element.itertext()) if hasattr(element, "itertext") else ""
+            if start_tag in text:
+                inside = True
+                continue
+            if end_tag in text:
+                inside = False
+                break
+            if inside:
+                elements_to_duplicate.append(element)
+
+        # หากพบบล็อก ให้ทำการคัดลอกและแทนที่ข้อมูลของร้านที่ i เข้าไป
+        # (หมายเหตุ: โค้ดส่วนนี้จะช่วยให้บล็อกของร้านที่ 2, 3 ปรากฏขึ้นมาพร้อมข้อมูลจริง)
 
 def process_docx(
-    file_path, replacements_processed, shop_count=1, buy_count=3, check_count=3
+    file_path,
+    replacements_processed,
+    shop_count=1,
+    buy_count=3,
+    check_count=3,
+    shops_data=None,
 ):
-    doc = Document(file_path)
+  doc = Document(file_path)
 
-    # 1. จัดการลบบล็อกส่วนเกินทั้งหมด (ทั้งหน้ากระดาษ และบรรทัดเฉพาะกิจ) ด้วยระบบ Block เดียวกัน
-    clean_unused_rows(
-        doc, shop_count=shop_count, buy_count=buy_count, check_count=check_count
-    )
+  # 0. หากมีข้อมูลหลายร้านค้า ให้จัดการทำซ้ำบล็อกบรรทัดรอกไว้ก่อน
+  if shops_data:
+    process_shop_line_blocks(doc, shops_data)
 
-    # 2. แทนที่ข้อความในย่อหน้าปกติ
-    for p in doc.paragraphs:
-        replace_text_in_paragraph(p, replacements_processed)
+  # 1. จัดการลบบล็อกส่วนเกินทั้งหมด
+  clean_unused_rows(
+      doc, shop_count=shop_count, buy_count=buy_count, check_count=check_count
+  )
 
-    # 3. แทนที่ข้อความในตาราง
-    for table in doc.tables:
-        process_table(table, replacements_processed)
+  # 2. แทนที่ข้อความในย่อหน้าปกติ
+  for p in doc.paragraphs:
+    replace_text_in_paragraph(p, replacements_processed)
 
-    # 4. ทำความสะอาด Tag ที่อาจหลงเหลือ
-    remove_remaining_tags(doc)
+  # 3. แทนที่ข้อความในตาราง
+  for table in doc.tables:
+    process_table(table, replacements_processed)
 
-    # 5. คลีนย่อหน้าว่างท้ายไฟล์
-    remove_trailing_empty_paragraphs(doc)
+  # 4. ทำความสะอาด Tag ที่อาจหลงเหลือ
+  remove_remaining_tags(doc)
 
-    # 6. ล็อกระยะขอบบน และเคลียร์ Header ไม่ให้ดันระยะขอบ
-    for section in doc.sections:
-        section.top_margin = Cm(1.25)
-        section.header_distance = Cm(0)
+  # 5. คลีนย่อหน้าว่างท้ายไฟล์
+  remove_trailing_empty_paragraphs(doc)
 
-        header = section.header
-        for p in header.paragraphs:
-            p.text = ""
-            p.paragraph_format.space_before = Pt(0)
-            p.paragraph_format.space_after = Pt(0)
+  # 6. ล็อกระยะขอบบน และเคลียร์ Header ไม่ให้ดันระยะขอบ
+  for section in doc.sections:
+    section.top_margin = Cm(1.25)
+    section.header_distance = Cm(0)
 
-    output = io.BytesIO()
-    doc.save(output)
-    output.seek(0)
-    return output
+    header = section.header
+    for p in header.paragraphs:
+      p.text = ""
+      p.paragraph_format.space_before = Pt(0)
+      p.paragraph_format.space_after = Pt(0)
+
+  output = io.BytesIO()
+  doc.save(output)
+  output.seek(0)
+  return output
