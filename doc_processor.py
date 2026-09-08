@@ -284,96 +284,46 @@ def remove_trailing_empty_paragraphs(doc):
         else:
             break
 def process_shop_line_blocks(doc, shop_count):
-  """ฟังก์ชันคัดลอกและสร้างบล็อกบรรทัด (Line Block) สำหรับหลายร้านค้าอัตโนมัติ"""
-  if shop_count <= 1:
-    return
+  """จัดการบรรทัดร้านค้า (START_SHOP_LINE / END_SHOP_LINE):
 
+  - ถ้าร้านใดเกินกว่าจำนวนที่เลือก (i > shop_count): ลบทิ้งทั้งย่อหน้าทันที
+  - ถ้าร้านใดอยู่ในจำนวนที่เลือก (i <= shop_count): เก็บย่อหน้านั้นไว้รอรับข้อมูล
+  """
   body = doc.element.body
 
-  for i in range(2, shop_count + 1):
-    start_tag = f"{{{{START_SHOP_LINE{i}}}}}"
-    end_tag = f"{{{{END_SHOP_LINE{i}}}}}"
-
-    # 1. ค้นหาองค์ประกอบที่อยู่ระหว่าง START_SHOP_LINE1 และ END_SHOP_LINE1 เพื่อนำมาเป็นแม่แบบ (Template)
-    template_elements = []
-    inside = False
-    parent_map = {}
-
+  for i in range(2, 5):  # ตรวจสอบร้านที่ 2, 3, 4
+    elements_to_remove = []
     for element in list(body):
       text = "".join(element.itertext()) if hasattr(element, "itertext") else ""
+      # ตรวจสอบว่าเป็นแท็กของร้านที่ i นี้หรือไม่
+      if (
+          f"SHOP_LINE{i}" in text
+          or f"SHOP{i}_LINE" in text
+          or f"START_SHOP{i}" in text
+      ):
+        if i > shop_count:
+          elements_to_remove.append(element)
 
-      if f"{{{{START_SHOP_LINE1}}}}" in text:
-        inside = True
-        continue
-      if f"{{{{END_SHOP_LINE1}}}}" in text:
-        inside = False
-        break
-      if inside:
-        template_elements.append(element)
-
-    # 2. หากลุ่มเป้าหมายของร้านที่ i (เช่น START_SHOP_LINE2 ถึง END_SHOP_LINE2) เพื่อแทรกข้อมูลแทนที่
-    target_found = False
-    target_elements = []
-    inside_target = False
-
-    for element in list(body):
-      text = "".join(element.itertext()) if hasattr(element, "itertext") else ""
-
-      if start_tag in text:
-        inside_target = True
-        target_found = True
-        continue
-      if end_tag in text:
-        inside_target = False
-        break
-      if inside_target:
-        target_elements.append(element)
-
-    # 3. ถ้าพบบล็อกเป้าหมาย ให้ทำการจำลองข้อความจากแม่แบบ (ร้านที่ 1) มาแปลงเลข 1 เป็นเลข i
-    if target_found and template_elements:
-      for element in target_elements:
-        parent = element.getparent()
-        if parent is not None:
-          parent.remove(element)
-
-      # แทรกสำเนาองค์ประกอบ พร้อมเปลี่ยนเลขแท็กให้ตรงกับร้านที่ i
-      insertion_point = None
-      for element in list(body):
-        text = "".join(element.itertext()) if hasattr(element, "itertext") else ""
-        if end_tag in text:
-          insertion_point = element
-          break
-
-      if insertion_point is not None:
-        for template_el in template_elements:
-          new_el = template_el.makecopy()
-          # เปลี่ยนข้อความภายในแท็กจากเลข 1 เป็นเลข i
-          for node in new_el.iterdescendants():
-            if node.text:
-              node.text = (
-                  node.text.replace("SHOP_LINE1", f"SHOP_LINE{i}")
-                  .replace("VENDOR_NAME1", f"VENDOR_NAME{i}")
-                  .replace("PRICE1", f"PRICE{i}")
-                  .replace("BUDGET_WITH_TEXT_MID1", f"BUDGET_WITH_TEXT_MID{i}")
-              )
-          insertion_point.getparent().insert(
-              insertion_point.getparent().index(insertion_point), new_el
-          )
+    # ลบย่อหน้าที่เกินออกไปเลย ไม่ให้เหลือพื้นที่ว่าง
+    for el in elements_to_remove:
+      parent = el.getparent()
+      if parent is not None:
+        parent.remove(el)
 
 def process_docx(
     file_path, replacements_processed, shop_count=1, buy_count=3, check_count=3
 ):
   doc = Document(file_path)
 
-  # 1. จัดการลบบล็อกส่วนเกิน (กรณีเลือกจำนวนร้านน้อยกว่าที่มี)
+  # 1. จัดการลบบล็อกตารางส่วนเกิน
   clean_unused_rows(
       doc, shop_count=shop_count, buy_count=buy_count, check_count=check_count
   )
 
-  # 2. แกะแท็ก START/END ของร้านที่เลือกออก เพื่อให้ข้อความข้างในแสดงผลและไม่เหลือบรรทัดว่าง
-  unwrap_used_line_blocks(doc, shop_count)
+  # 2. ลบบรรทัดข้อความของร้านที่ไม่ได้เลือกทิ้งทันที (แบบเรียบง่าย ชัดเจน)
+  process_shop_line_blocks(doc, shop_count)
 
-  # 3. แทนที่ข้อความในย่อหน้าปกติ
+  # 3. แทนที่ข้อความในย่อหน้าปกติ (ระบบจะช่วยลบแท็ก START/END ที่เหลือ และใส่ข้อมูลจริงให้)
   for p in doc.paragraphs:
     replace_text_in_paragraph(p, replacements_processed)
 
