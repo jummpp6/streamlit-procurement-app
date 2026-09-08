@@ -1,5 +1,5 @@
 # ==========================================
-# ไฟล์: doc_processor.py (ฉบับสมบูรณ์: คงฟังก์ชันเดิม 100% + เพิ่มฟังก์ชันใหม่จัดการ SHOP_LINE แยกเด็ดขาด)
+# ไฟล์: doc_processor.py (ฉบับสมบูรณ์: คงฟังก์ชันเดิม 100% + เพิ่มฟังก์ชันจัดการ SHOP_LINE แยกเด็ดขาด)
 # ==========================================
 import io
 import re
@@ -139,7 +139,7 @@ def remove_row_from_table(table, keywords_to_remove):
 
 
 # ==========================================
-# 1. ฟังก์ชันเดิมต้นฉบับของพี่ (คงไว้ 100% ไม่แตะต้องใดๆ ทั้งสิ้น)[cite: 21]
+# 1. ฟังก์ชันเดิมต้นฉบับ 100% (ห้ามแตะต้อง/ไม่แก้ไขใดๆ ทั้งสิ้น)
 # ==========================================
 def remove_block_by_tags(doc, start_tag, end_tag):
     """ฟังก์ชันลบบล็อกอัจฉริยะ: รองรับทั้งหน้ากระดาษและบล็อกบรรทัด ทั้งใน Body หลักและในตาราง"""
@@ -184,10 +184,10 @@ def remove_block_by_tags(doc, start_tag, end_tag):
 
 
 # ==========================================
-# 2. ฟังก์ชันใหม่ที่สร้างเพิ่มขึ้นมาเฉพาะกิจ (สำหรับจัดการ START_SHOP_LINE / END_SHOP_LINE ในตาราง)
+# 2. ฟังก์ชันใหม่ที่เพิ่มขึ้นมา (สำหรับจัดการบล็อกบรรทัด SHOP_LINE ในตารางโดยเฉพาะ)
 # ==========================================
 def remove_shop_line_block_by_tags(doc, start_tag, end_tag):
-    """ฟังก์ชันใหม่: ใช้สำหรับลบบล็อกบรรทัดร้านค้าในตารางโดยเฉพาะ แยกขาดจากฟังก์ชันเดิม"""
+    """ฟังก์ชันใหม่: ใช้ลบแถวตารางที่ครอบด้วย START_SHOP_LINE / END_SHOP_LINE โดยไม่กระทบฟังก์ชันเดิม"""
     def clean_table_rows(table):
         rows_to_remove = []
         inside_table_block = False
@@ -229,10 +229,10 @@ def clean_unused_rows(doc, shop_count=1, buy_count=3, check_count=3):
         keywords_to_remove.append(f"{{{{VENDOR_NAME{i}}}}}")
         keywords_to_remove.append(f"{{{{VENDOR_NAME_{i}}}}}")
 
-        # ใช้ฟังก์ชันเดิมต้นฉบับ สำหรับลบบล็อกหน้ากระดาษส่วนเกิน (ห้ามแตะต้อง)[cite: 21]
+        # ใช้ฟังก์ชันเดิมต้นฉบับ สำหรับลบบล็อกหน้ากระดาษ (START_SHOP / END_SHOP)
         remove_block_by_tags(doc, f"{{{{START_SHOP{i}}}}}", f"{{{{END_SHOP{i}}}}}")
 
-        # ใช้ฟังก์ชันใหม่ที่สร้างเพิ่ม สำหรับลบบล็อกบรรทัด VENDOR_LINE ในตารางโดยเฉพาะ
+        # ใช้ฟังก์ชันใหม่ที่เพิ่มเข้ามา สำหรับจัดการบล็อกบรรทัดในตาราง (START_SHOP_LINE / END_SHOP_LINE)
         remove_shop_line_block_by_tags(
             doc, f"{{{{START_SHOP_LINE{i}}}}}", f"{{{{END_SHOP_LINE{i}}}}}"
         )
@@ -290,7 +290,7 @@ def remove_trailing_empty_paragraphs(doc):
 def process_docx(
     file_path, replacements_processed, shop_count=1, buy_count=3, check_count=3
 ):
-    # ตรวจหาจำนวนร้านค้าอัตโนมัติจากข้อมูลที่ส่งเข้ามา เพื่อให้ร้านที่เลือก (2, 3 หรือ 4 ร้าน) แสดงผลออกมาครบถ้วน
+    # ตรวจหาจำนวนร้านค้าอัตโนมัติจากข้อมูล เพื่อให้ร้านที่เลือกแสดงผลออกมาครบถ้วน
     for i in [4, 3, 2]:
         if any(f"VENDOR_NAME{i}" in k or f"SUBMIT_NO{i}" in k or f"BUDGET_MID{i}" in k for k in replacements_processed.keys()):
             shop_count = max(shop_count, i)
