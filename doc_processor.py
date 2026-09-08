@@ -79,8 +79,10 @@ def set_font_exact_16(run, font_name="TH SarabunPSK", font_size_pt=16, is_bold=N
 def replace_text_in_paragraph(paragraph, replacements, default_font="TH SarabunPSK"):
     full_text = "".join([run.text for run in paragraph.runs])
 
-    # ลบ Tag START/END ทุกรูปแบบที่อาจค้างอยู่
-    full_text = re.sub(r"\{\{.*?(START|END)_.*?\}\}", "", full_text)
+    # 🟢 ปรับปรุง Regex ให้รองรับการลบ Tag START/END ทุกรูปแบบแม้มีช่องว่างหรือพิมพ์ผิดเพี้ยน
+    full_text = re.sub(r"\{\{.*?_?(START|END)_.*?\}\}", "", full_text)
+    full_text = re.sub(r"\{\{.*?START_SHOP\d*\}\}", "", full_text)
+    full_text = re.sub(r"\{\{.*?END_SHOP\d*\}\}", "", full_text)
 
     has_target_key = any(key in full_text for key in replacements.keys())
 
@@ -96,6 +98,23 @@ def replace_text_in_paragraph(paragraph, replacements, default_font="TH SarabunP
                 set_font_exact_16(
                     paragraph.runs[0], default_font, font_size_pt=16, is_bold=is_bold
                 )
+        return
+
+    first_run = paragraph.runs[0] if paragraph.runs else None
+    is_bold = first_run.bold if first_run else False
+
+    for key, value in replacements.items():
+        if key in full_text:
+            full_text = full_text.replace(key, str(value))
+
+    for run in paragraph.runs:
+        run.text = ""
+
+    if paragraph.runs:
+        paragraph.runs[0].text = full_text
+        set_font_exact_16(
+            paragraph.runs[0], default_font, font_size_pt=16, is_bold=is_bold
+        )
         return
 
     first_run = paragraph.runs[0] if paragraph.runs else None
