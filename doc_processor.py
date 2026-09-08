@@ -1,5 +1,5 @@
 # ==========================================
-# ไฟล์: doc_processor.py (ฉบับสมบูรณ์: คงฟังก์ชันเดิม 100% และสร้างฟังก์ชันใหม่แยกเฉพาะ SHOP_LINE)
+# ไฟล์: doc_processor.py (ฉบับสมบูรณ์: คงฟังก์ชันเดิม 100% + เพิ่มฟังก์ชันใหม่จัดการ SHOP_LINE แยกเด็ดขาด)
 # ==========================================
 import io
 import re
@@ -139,7 +139,7 @@ def remove_row_from_table(table, keywords_to_remove):
 
 
 # ==========================================
-# 1. ฟังก์ชันเดิมของพี่ (ห้ามแตะต้อง 100% ตามที่พี่สั่ง)
+# 1. ฟังก์ชันเดิมต้นฉบับของพี่ (คงไว้ 100% ไม่แตะต้องใดๆ ทั้งสิ้น)[cite: 21]
 # ==========================================
 def remove_block_by_tags(doc, start_tag, end_tag):
     """ฟังก์ชันลบบล็อกอัจฉริยะ: รองรับทั้งหน้ากระดาษและบล็อกบรรทัด ทั้งใน Body หลักและในตาราง"""
@@ -184,47 +184,41 @@ def remove_block_by_tags(doc, start_tag, end_tag):
 
 
 # ==========================================
-# 2. ฟังก์ชันใหม่ที่สร้างเพิ่มขึ้นมาเพื่อจัดการ START_SHOP_LINE โดยเฉพาะ
+# 2. ฟังก์ชันใหม่ที่สร้างเพิ่มขึ้นมาเฉพาะกิจ (สำหรับจัดการ START_SHOP_LINE / END_SHOP_LINE ในตาราง)
 # ==========================================
-def remove_shop_line_block(doc, start_tag, end_tag):
-    """ฟังก์ชันใหม่สำหรับจัดการบล็อกบรรทัดร้านค้า (START_SHOP_LINE / END_SHOP_LINE) โดยเฉพาะ"""
-    def process_elements(parent_container):
-        elements_to_remove = []
-        inside_block = False
+def remove_shop_line_block_by_tags(doc, start_tag, end_tag):
+    """ฟังก์ชันใหม่: ใช้สำหรับลบบล็อกบรรทัดร้านค้าในตารางโดยเฉพาะ แยกขาดจากฟังก์ชันเดิม"""
+    def clean_table_rows(table):
+        rows_to_remove = []
+        inside_table_block = False
 
-        for element in list(parent_container):
-            text = "".join(element.itertext()) if hasattr(element, "itertext") else ""
+        for row in table.rows:
+            row_text = "".join([cell.text for cell in row.cells])
 
-            if start_tag in text:
-                inside_block = True
-                elements_to_remove.append(element)
-                if end_tag in text:
-                    inside_block = False
+            if start_tag in row_text:
+                inside_table_block = True
+                rows_to_remove.append(row._tr)
+                if end_tag in row_text:
+                    inside_table_block = False
                 continue
 
-            if inside_block:
-                elements_to_remove.append(element)
-                if end_tag in text:
-                    inside_block = False
+            if inside_table_block:
+                rows_to_remove.append(row._tr)
+                if end_tag in row_text:
+                    inside_table_block = False
 
-        for element in elements_to_remove:
-            parent = element.getparent()
+        for tr in rows_to_remove:
+            parent = tr.getparent()
             if parent is not None:
-                parent.remove(element)
+                parent.remove(tr)
 
-    # ลบใน Body หลัก
-    process_elements(doc.element.body)
-
-    # ลบในตารางทั้งหมด
-    def check_tables(tbl):
-        for row in tbl.rows:
+        for row in table.rows:
             for cell in row.cells:
-                process_elements(cell._tc)
-                for nested_tbl in cell.tables:
-                    check_tables(nested_tbl)
+                for nested_table in cell.tables:
+                    clean_table_rows(nested_table)
 
     for table in doc.tables:
-        check_tables(table)
+        clean_table_rows(table)
 
 
 def clean_unused_rows(doc, shop_count=1, buy_count=3, check_count=3):
@@ -235,11 +229,13 @@ def clean_unused_rows(doc, shop_count=1, buy_count=3, check_count=3):
         keywords_to_remove.append(f"{{{{VENDOR_NAME{i}}}}}")
         keywords_to_remove.append(f"{{{{VENDOR_NAME_{i}}}}}")
 
-        # ใช้ฟังก์ชันเดิมต้นฉบับ สำหรับลบบล็อกหน้ากระดาษ (START_SHOP / END_SHOP) ตามที่พี่สั่ง
+        # ใช้ฟังก์ชันเดิมต้นฉบับ สำหรับลบบล็อกหน้ากระดาษส่วนเกิน (ห้ามแตะต้อง)[cite: 21]
         remove_block_by_tags(doc, f"{{{{START_SHOP{i}}}}}", f"{{{{END_SHOP{i}}}}}")
 
-        # ใช้ฟังก์ชันใหม่ที่สร้างขึ้นมา สำหรับจัดการบล็อกบรรทัด (START_SHOP_LINE / END_SHOP_LINE) โดยเฉพาะ
-        remove_shop_line_block(doc, f"{{{{START_SHOP_LINE{i}}}}}", f"{{{{END_SHOP_LINE{i}}}}}")
+        # ใช้ฟังก์ชันใหม่ที่สร้างเพิ่ม สำหรับลบบล็อกบรรทัด VENDOR_LINE ในตารางโดยเฉพาะ
+        remove_shop_line_block_by_tags(
+            doc, f"{{{{START_SHOP_LINE{i}}}}}", f"{{{{END_SHOP_LINE{i}}}}}"
+        )
 
     # 2. เช็กแท็กกรรมการจัดซื้อส่วนเกิน
     for i in range(buy_count + 1, 4):
@@ -294,7 +290,7 @@ def remove_trailing_empty_paragraphs(doc):
 def process_docx(
     file_path, replacements_processed, shop_count=1, buy_count=3, check_count=3
 ):
-    # ตรวจหาจำนวนร้านค้าอัตโนมัติจากข้อมูล เพื่อให้ร้านที่เลือก (2, 3 หรือ 4 ร้าน) แสดงผลออกมาครบถ้วน
+    # ตรวจหาจำนวนร้านค้าอัตโนมัติจากข้อมูลที่ส่งเข้ามา เพื่อให้ร้านที่เลือก (2, 3 หรือ 4 ร้าน) แสดงผลออกมาครบถ้วน
     for i in [4, 3, 2]:
         if any(f"VENDOR_NAME{i}" in k or f"SUBMIT_NO{i}" in k or f"BUDGET_MID{i}" in k for k in replacements_processed.keys()):
             shop_count = max(shop_count, i)
