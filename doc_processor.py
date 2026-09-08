@@ -197,7 +197,27 @@ def remove_block_by_tags(doc, start_tag, end_tag):
 
     for table in doc.tables:
         check_tables(table)
+def unwrap_used_line_blocks(doc, shop_count):
+  """ลบบรรทัดที่เป็นแท็ก START/END ของร้านที่ใช้งานจริงทิ้ง เพื่อไม่ให้เหลือบรรทัดว่าง
 
+  และปล่อยให้ข้อความด้านในแสดงผลปกติ
+  """
+  body = doc.element.body
+  for i in range(2, shop_count + 1):
+    start_tag = f"{{{{START_SHOP_LINE{i}}}}}"
+    end_tag = f"{{{{END_SHOP_LINE{i}}}}}"
+
+    elements_to_remove = []
+    for element in list(body):
+      text = "".join(element.itertext()) if hasattr(element, "itertext") else ""
+      if start_tag in text or end_tag in text:
+        elements_to_remove.append(element)
+
+    # ลบเฉพาะบรรทัดแท็กออก ไม่ให้เหลือช่องว่าง
+    for el in elements_to_remove:
+      parent = el.getparent()
+      if parent is not None:
+        parent.remove(el)
 
 def clean_unused_rows(doc, shop_count=1, buy_count=3, check_count=3):
     keywords_to_remove = []
