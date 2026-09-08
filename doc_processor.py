@@ -1,5 +1,5 @@
 # ==========================================
-# ไฟล์: doc_processor.py (ปรับปรุงจากโค้ดเดิมของคุณเพื่อแก้ปัญหาลบบล็อกร้านค้า)
+# ไฟล์: doc_processor.py (อิงตาม doc_processor (1)_3.py ต้นฉบับ พร้อมระบบตรวจจับจำนวนร้านอัติโนมัติ)
 # ==========================================
 import io
 import re
@@ -139,44 +139,59 @@ def remove_row_from_table(table, keywords_to_remove):
 
 
 def remove_block_by_tags(doc, start_tag, end_tag):
-    """ฟังก์ชันลบบล็อกอัจฉริยะ (แก้ไขให้กวาดล้างโหนด XML ระหว่าง START และ END ได้อย่างเด็ดขาด)"""
-    body = doc.element.body
-    elements_to_remove = []
-    inside_block = False
+    """ฟังก์ชันลบบล็อกอัจฉริยะ: รองรับทั้งหน้ากระดาษและบล็อกบรรทัด ทั้งใน Body หลักและในตาราง"""
 
-    for child in list(body):
-        text = "".join(child.itertext()) if hasattr(child, "itertext") else ""
+    def process_elements(parent_container):
+        elements_to_remove = []
+        inside_block = False
 
-        if start_tag in text:
-            inside_block = True
-            elements_to_remove.append(child)
-            if end_tag in text:
-                inside_block = False
-            continue
+        for element in list(parent_container):
+            text = "".join(element.itertext()) if hasattr(element, "itertext") else ""
 
-        if inside_block:
-            elements_to_remove.append(child)
-            if end_tag in text:
-                inside_block = False
+            if start_tag in text:
+                inside_block = True
+                elements_to_remove.append(element)
+                if end_tag in text:
+                    inside_block = False
+                continue
 
-    for element in elements_to_remove:
-        parent = element.getparent()
-        if parent is not None:
-            parent.remove(element)
+            if inside_block:
+                elements_to_remove.append(element)
+                if end_tag in text:
+                    inside_block = False
+
+        for element in elements_to_remove:
+            parent = element.getparent()
+            if parent is not None:
+                parent.remove(element)
+
+    # 1. ค้นหาและลบใน Body หลักของเอกสาร
+    process_elements(doc.element.body)
+
+    # 2. ค้นหาและลบในตารางทั้งหมด (รวมถึงตารางซ้อนเซลล์) เพื่อให้แน่ใจว่าบล็อกในตารางถูกลบเกลี้ยง
+    def check_tables(tbl):
+        for row in tbl.rows:
+            for cell in row.cells:
+                process_elements(cell._tc)
+                for nested_tbl in cell.tables:
+                    check_tables(nested_tbl)
+
+    for table in doc.tables:
+        check_tables(table)
 
 
 def clean_unused_rows(doc, shop_count=1, buy_count=3, check_count=3):
     keywords_to_remove = []
 
-    # 1. เช็กแท็กร้านค้าส่วนเกิน และสั่งลบบล็อกหน้ากระดาษทิ้งทันที
+    # 1. เช็กแท็กร้านค้าส่วนเกิน (ใช้ระบบ Block ทั้งแบบหน้ากระดาษ และแบบบรรทัดเฉพาะกิจ)
     for i in range(shop_count + 1, 5):
         keywords_to_remove.append(f"{{{{VENDOR_NAME{i}}}}}")
         keywords_to_remove.append(f"{{{{VENDOR_NAME_{i}}}}}")
 
-        # ลบบล็อกหน้ากระดาษส่วนเกินตามแท็ก START_SHOP / END_SHOP
+        # ลบบล็อกหน้ากระดาษส่วนเกิน (เช่น ใบสั่งซื้อ, ใบตรวจรับ)
         remove_block_by_tags(doc, f"{{{{START_SHOP{i}}}}}", f"{{{{END_SHOP{i}}}}}")
 
-        # ลบบล็อกบรรทัดเฉพาะกิจ
+        # ลบบล็อกบรรทัดเฉพาะกิจ (เช่น บันทึกสรุป ที่ครอบด้วย START_SHOP_LINE / END_SHOP_LINE)
         remove_block_by_tags(
             doc, f"{{{{START_SHOP_LINE{i}}}}}", f"{{{{END_SHOP_LINE{i}}}}}"
         )
@@ -234,6 +249,12 @@ def remove_trailing_empty_paragraphs(doc):
 def process_docx(
     file_path, replacements_processed, shop_count=1, buy_count=3, check_count=3
 ):
+    # ตรวจหาจำนวนร้านค้าอัตโนมัติจากข้อมูลที่ส่งเข้ามา ป้องกันกรณี shop_count ติดค่า 1 แล้วร้าน 2, 3 หาย
+    for i in [4, 3, 2]:
+        if any(f"VENDOR_NAME{i}" in k or f"BUDGET_MID{i}" in k or f"SUBMIT_NO{i}" in k for k in replacements_processed.keys()):
+            shop_count = max(shop_count, i)
+            break
+
     doc = Document(file_path)
 
     # 1. จัดการลบบล็อกส่วนเกินทั้งหมด (ทั้งหน้ากระดาษ และบรรทัดเฉพาะกิจ) ด้วยระบบ Block เดียวกัน
