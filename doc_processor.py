@@ -1,5 +1,5 @@
 # ==========================================
-# ไฟล์: doc_processor.py (ฉบับสมบูรณ์: ใช้ระบบ Block ครบวงจร)
+# ไฟล์: doc_processor.py (ฉบับแก้ไข: รองรับหลายร้านค้าและ Auto-detect)
 # ==========================================
 import io
 import re
@@ -13,8 +13,8 @@ def to_thai_num(text):
     if not text:
         return ""
     arabic_digits = "0123456789"
-    thai_digits = "๐๑๒๓๔๕๖๗๘๙"
-    return str(text).translate(str.maketrans(arabic_digits, thai_digits))
+    thai_digits = "๐๑๒๓ภาษ์๐๑๒๓๔๕๖๗๘๙" # keeping standard thai digits conversion
+    return str(text).translate(str.maketrans("0123456789", "๐๑๒๓๔๕๖๗๘๙"))
 
 
 def format_thai_date(date_obj, use_thai=True):
@@ -139,7 +139,7 @@ def remove_row_from_table(table, keywords_to_remove):
 
 
 def remove_block_by_tags(doc, start_tag, end_tag):
-    """ฟังก์ชันลบบล็อกอัจฉริยะ: รองรับทั้งหน้ากระดาษและบล็อกบรรทัด ทั้งใน Body หลักและในตาราง"""
+    """ฟังก์ชันลบบล็อกอัจฉริยะ: รองรับทั้งหน้ากระดาษ บล็อกบรรทัด และแถวตาราง (w:tr)"""
 
     def process_elements(parent_container):
         elements_to_remove = []
@@ -168,8 +168,31 @@ def remove_block_by_tags(doc, start_tag, end_tag):
     # 1. ค้นหาและลบใน Body หลักของเอกสาร
     process_elements(doc.element.body)
 
-    # 2. ค้นหาและลบในตารางทั้งหมด (รวมถึงตารางซ้อนเซลล์) เพื่อให้แน่ใจว่าบล็อกในตารางถูกลบเกลี้ยง
+    # 2. ค้นหาและลบในตาราง (รองรับทั้งระดับแถว w:tr และเซลล์)
     def check_tables(tbl):
+        # ตรวจสอบระดับแถวในตารางหลัก
+        rows_to_remove = []
+        inside_table_block = False
+        for row in tbl.rows:
+            tr = row._tr
+            row_text = "".join(tr.itertext()) if hasattr(tr, "itertext") else ""
+            if start_tag in row_text:
+                inside_table_block = True
+                rows_to_remove.append(tr)
+                if end_tag in row_text:
+                    inside_table_block = False
+                continue
+            if inside_table_block:
+                rows_to_remove.append(tr)
+                if end_tag in row_text:
+                    inside_table_block = False
+
+        for tr in rows_to_remove:
+            parent = tr.getparent()
+            if parent is not None:
+                parent.remove(tr)
+
+        # ตรวจสอบเซลล์และตารางซ้อน
         for row in tbl.rows:
             for cell in row.cells:
                 process_elements(cell._tc)
@@ -249,9 +272,15 @@ def remove_trailing_empty_paragraphs(doc):
 def process_docx(
     file_path, replacements_processed, shop_count=1, buy_count=3, check_count=3
 ):
+    # Auto-detect shop_count จากข้อมูล replacements ป้องกันกรณีลืมส่งค่าเข้ามา
+    for i in [4, 3, 2]:
+        if any(f"VENDOR_NAME{i}" in k or f"BUDGET_MID{i}" in k or f"SUBMIT_NO{i}" in k for k in replacements_processed.keys()):
+            shop_count = max(shop_count, i)
+            break
+
     doc = Document(file_path)
 
-    # 1. จัดการลบบล็อกส่วนเกินทั้งหมด (ทั้งหน้ากระดาษ และบรรทัดเฉพาะกิจ) ด้วยระบบ Block เดียวกัน
+    # 1. จัดการลบบล็อกส่วนเกินทั้งหมด (ทั้งหน้ากระดาษ และบรรทัดเฉพาะกิจ) ด้วยระบบ Block
     clean_unused_rows(
         doc, shop_count=shop_count, buy_count=buy_count, check_count=check_count
     )
