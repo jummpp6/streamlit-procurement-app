@@ -437,7 +437,7 @@ def render_fourcolor_dialog(
 
     st.info(f"💰 **ราคารวมทั้งหมด:** {total_amount:,.2f} บาท")
 
-    is_price_matched = abs(total_amount - default_total_amount) < 0.01
+    is_price_matched = True  # 🟢 ปลดล็อกเงื่อนไขเช็คราคารวม
 
     if not is_price_matched and default_total_amount > 0:
         st.warning(
