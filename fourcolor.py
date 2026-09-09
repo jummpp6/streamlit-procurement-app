@@ -84,7 +84,6 @@ def format_baht_satang(val):
         if pd.isna(val) or val == "":
             return "", "-"
         num = float(str(val).replace(",", ""))
-        # ใช้ string formatting ป้องกันปัญหา Floating-point precision error
         s_val = f"{num:.2f}"
         baht_str, satang_str = s_val.split(".")
         baht = int(baht_str)
@@ -170,7 +169,6 @@ def generate_fourcolor_excel(
                 global_idx = start_idx + local_i
                 item_name = str(item.get("name", ""))
                 
-                # จัดการจำนวน (Quantity) ให้เป็นจำนวนเต็มหากไม่มีเศษ
                 raw_qty = float(item.get("quantity", 1.0))
                 item_qty = int(raw_qty) if raw_qty.is_integer() else raw_qty
                 
@@ -288,36 +286,26 @@ def generate_fourcolor_excel(
                         set_cell_value_safe(ws, current_row, col, "")
                 current_row += 1
 
-            page_end_row = 10 + len(page_items)
-            set_cell_value_safe(ws, summary_row, 4, "แผ่นนี้")
-            set_cell_value_safe(ws, summary_row, 10, f"=SUM(J11:J{page_end_row})")
-            set_cell_value_safe(ws, summary_row, 11, "-")
+            # 🛠️ คำนวณและแยกส่วนบาท/สตางค์ สำหรับ "แผ่นนี้" และ "รวมทั้งสิ้น" ให้ถูกต้อง
+            page_total_val = page_items["total_price"].sum() if not page_items.empty else 0.0
+            p_baht, p_sat = format_baht_satang(page_total_val)
 
-            page_cumulative_amount = (
+            set_cell_value_safe(ws, summary_row, 4, "แผ่นนี้")
+            set_cell_value_safe(ws, summary_row, 10, p_baht)
+            set_cell_value_safe(ws, summary_row, 11, p_sat)
+
+            cumulative_amount = (
                 page_items["total_price"].sum()
                 if total_pages == 1
                 else valid_items.iloc[0:end_idx]["total_price"].sum()
             )
-            page_budget_text = bahttext(page_cumulative_amount)
+            cumulative_budget_text = bahttext(cumulative_amount)
+            c_baht, c_sat = format_baht_satang(cumulative_amount)
 
             set_cell_value_safe(ws, grand_summary_row, 4, "รวมทั้งสิ้น")
-            set_cell_value_safe(ws, grand_summary_row, 6, page_budget_text)
-
-            sum_col_letter = f"J{summary_row}"
-            if total_pages == 1:
-                set_cell_value_safe(ws, grand_summary_row, 10, f"={sum_col_letter}")
-            else:
-                if page_idx == 0:
-                    set_cell_value_safe(ws, grand_summary_row, 10, f"={sum_col_letter}")
-                else:
-                    prev_sheet_name = f"{target_sheet_name}_{page_idx}"
-                    set_cell_value_safe(
-                        ws,
-                        grand_summary_row,
-                        10,
-                        f"='{prev_sheet_name}'!J{grand_summary_row} + {sum_col_letter}",
-                    )
-            set_cell_value_safe(ws, grand_summary_row, 11, "-")
+            set_cell_value_safe(ws, grand_summary_row, 6, cumulative_budget_text)
+            set_cell_value_safe(ws, grand_summary_row, 10, c_baht)
+            set_cell_value_safe(ws, grand_summary_row, 11, c_sat)
 
             for r_idx in range(11, 30):
                 ws.row_dimensions[r_idx].height = 21
