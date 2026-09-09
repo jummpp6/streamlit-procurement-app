@@ -371,7 +371,8 @@ def render_fourcolor_dialog(
             "quantity": st.column_config.NumberColumn(
                 "จำนวน",
                 min_value=0.0,
-                step=1.0,
+                step=0.01,         # รองรับทศนิยม
+                format="%g",
                 default=1.0,
                 required=True,
             ),
@@ -383,7 +384,7 @@ def render_fourcolor_dialog(
             "price_per_unit": st.column_config.NumberColumn(
                 "ราคาต่อหน่วย (บาท)",
                 min_value=0.0,
-                step=10.0,
+                step=0.01,         # รองรับทศนิยมสตางค์
                 format="%.2f",
                 default=0.0,
                 required=True,
