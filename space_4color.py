@@ -8,16 +8,28 @@ from space import generate_space_excel, get_only_teacher_names
 
 
 def render_space_4color_page():
-    # ปุ่มกลับหน้าหลัก
+    # 🟢 เพิ่มการตรวจสอบและกำหนดค่าเริ่มต้น (Initialization) ป้องกัน Error
+    if "sf_initial_df" not in st.session_state:
+        st.session_state.sf_initial_df = pd.DataFrame([
+            {"name": "", "quantity": 1.0, "unit": "รายการ", "price_per_unit": 0.0}
+        ])
+    if "sf_data_editor_initialized" not in st.session_state:
+        st.session_state.sf_data_editor_initialized = True
+        
+    if "sc_items_df" not in st.session_state:
+        st.session_state.sc_items_df = pd.DataFrame([
+            {"name": "", "quantity": 1.0, "unit": "รายการ", "price_per_unit": 0.0}
+        ])
+
     if st.button("⬅️ กลับหน้าหลัก", use_container_width=False):
         st.session_state.page = "home"
         st.rerun()
 
     st.title("🎨 ระบบสร้างเอกสารสี่สี และ รายละเอียดคุณลักษณะ")
-    st.write(
-        "กรอกข้อมูลโครงการ รายการสินค้า และผู้รับพัสดุเพื่อสร้างเอกสารสี่สีและรายละเอียดคุณลักษณะพร้อมกันได้ทันที"
-    )
+    st.write("กรอกข้อมูลโครงการ รายการสินค้า และผู้รับพัสดุเพื่อสร้างเอกสารสี่สีและ Space พร้อมกันได้ทันที")
     st.markdown("---")
+
+    # โค้ดส่วนที่เหลือของฟังก์ชัน...
 
     # --- ส่วนที่ 1: ข้อมูลโครงการและพัสดุ ---
     st.subheader("📝 1. ข้อมูลโครงการและพัสดุ")
