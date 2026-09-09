@@ -84,12 +84,14 @@ def format_baht_satang(val):
         if pd.isna(val) or val == "":
             return "", "-"
         num = float(str(val).replace(",", ""))
-        if num.is_integer():
-            return int(num), "-"
+        # ใช้ string formatting ป้องกันปัญหา Floating-point precision error
+        s_val = f"{num:.2f}"
+        baht_str, satang_str = s_val.split(".")
+        baht = int(baht_str)
+        if satang_str == "00":
+            return baht, "-"
         else:
-            baht = int(num)
-            satang = round((num - baht) * 100)
-            return baht, f"{satang:02d}"
+            return baht, satang_str
     except Exception:
         return val, "-"
 
@@ -167,10 +169,14 @@ def generate_fourcolor_excel(
             ):
                 global_idx = start_idx + local_i
                 item_name = str(item.get("name", ""))
-                item_qty = float(item.get("quantity", 1.0))
+                
+                # จัดการจำนวน (Quantity) ให้เป็นจำนวนเต็มหากไม่มีเศษ
+                raw_qty = float(item.get("quantity", 1.0))
+                item_qty = int(raw_qty) if raw_qty.is_integer() else raw_qty
+                
                 item_unit = str(item.get("unit", "รายการ"))
                 item_price = float(item.get("price_per_unit", 0.0))
-                item_total = item_qty * item_price
+                item_total = raw_qty * item_price
 
                 ws.row_dimensions[current_row].height = 21
                 row_template_styles = {}
@@ -191,10 +197,7 @@ def generate_fourcolor_excel(
                 set_cell_value_safe(ws, current_row, 3, item_name)
                 set_cell_value_safe(ws, current_row, 4, "ป")
                 set_cell_value_safe(ws, current_row, 5, item_unit)
-
-                qty_cell = set_cell_value_safe(ws, current_row, 6, item_qty)
-                qty_cell.number_format = "0.##"
-
+                set_cell_value_safe(ws, current_row, 6, item_qty)
                 set_cell_value_safe(ws, current_row, 8, u_baht)
                 set_cell_value_safe(ws, current_row, 9, u_sat)
                 set_cell_value_safe(ws, current_row, 10, t_baht)
@@ -286,34 +289,35 @@ def generate_fourcolor_excel(
                 current_row += 1
 
             page_end_row = 10 + len(page_items)
+            set_cell_value_safe(ws, summary_row, 4, "แผ่นนี้")
+            set_cell_value_safe(ws, summary_row, 10, f"=SUM(J11:J{page_end_row})")
+            set_cell_value_safe(ws, summary_row, 11, "-")
 
-            # --- 1. ยอดสรุป "แผ่นนี้" (แถวที่ 30) ---
-            page_total_sum = page_items["total_price"].sum()
-            p_baht = int(page_total_sum)
-            p_sat = round((page_total_sum - p_baht) * 100)
-            p_sat_str = f"{p_sat:02d}" if p_sat > 0 else "-"
-
-            set_cell_value_safe(ws, summary_row, 10, p_baht).number_format = "#,##0"
-            set_cell_value_safe(ws, summary_row, 11, p_sat_str)
+            page_cumulative_amount = (
+                page_items["total_price"].sum()
+                if total_pages == 1
+                else valid_items.iloc[0:end_idx]["total_price"].sum()
+            )
+            page_budget_text = bahttext(page_cumulative_amount)
 
             set_cell_value_safe(ws, grand_summary_row, 4, "รวมทั้งสิ้น")
+            set_cell_value_safe(ws, grand_summary_row, 6, page_budget_text)
 
-            # ใช้ budget_text ของยอดรวมทั้งโครงการ เพื่อให้แสดงข้อความราคาเต็มทุกหน้า
-            set_cell_value_safe(ws, grand_summary_row, 6, budget_text)
-
-            # --- 2. ยอดสรุป "รวมทั้งสิ้น" (แถวที่ 31 - สะสมข้ามหน้า) ---
+            sum_col_letter = f"J{summary_row}"
             if total_pages == 1:
-                grand_total_sum = page_total_sum
+                set_cell_value_safe(ws, grand_summary_row, 10, f"={sum_col_letter}")
             else:
-                grand_total_sum = valid_items.iloc[0:end_idx]["total_price"].sum()
-
-            g_baht = int(grand_total_sum)
-            g_sat = round((grand_total_sum - g_baht) * 100)
-            g_sat_str = f"{g_sat:02d}" if g_sat > 0 else "-"
-
-            grand_cell = set_cell_value_safe(ws, grand_summary_row, 10, g_baht)
-            grand_cell.number_format = "#,##0"
-            set_cell_value_safe(ws, grand_summary_row, 11, g_sat_str)
+                if page_idx == 0:
+                    set_cell_value_safe(ws, grand_summary_row, 10, f"={sum_col_letter}")
+                else:
+                    prev_sheet_name = f"{target_sheet_name}_{page_idx}"
+                    set_cell_value_safe(
+                        ws,
+                        grand_summary_row,
+                        10,
+                        f"='{prev_sheet_name}'!J{grand_summary_row} + {sum_col_letter}",
+                    )
+            set_cell_value_safe(ws, grand_summary_row, 11, "-")
 
             for r_idx in range(11, 30):
                 ws.row_dimensions[r_idx].height = 21
