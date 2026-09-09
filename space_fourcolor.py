@@ -110,7 +110,12 @@ def render_space_fourcolor_dialog(
         column_config={
             "name": st.column_config.Column("รายการ", width="large", required=True),
             "quantity": st.column_config.NumberColumn(
-                "จำนวน", min_value=0.0, step=1.0, default=1.0, required=True
+                "จำนวน", 
+                min_value=0.0, 
+                step=0.01,         # รองรับทศนิยม
+                format="%g", 
+                default=1.0, 
+                required=True
             ),
             "unit": st.column_config.TextColumn(
                 "หน่วยนับ", default="รายการ", required=True
@@ -118,7 +123,7 @@ def render_space_fourcolor_dialog(
             "price_per_unit": st.column_config.NumberColumn(
                 "ราคาต่อหน่วย (บาท)",
                 min_value=0.0,
-                step=1.0,
+                step=0.01,         # รองรับทศนิยมสตางค์
                 format="%.2f",
                 default=0.0,
                 required=True,
