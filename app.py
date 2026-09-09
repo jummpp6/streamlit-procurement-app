@@ -1,3 +1,4 @@
+# ชื่อไฟล์: app.py
 import streamlit as st
 
 st.markdown(
@@ -24,8 +25,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-from hiring import render_hiring_page  # 👈 Import หน้าจัดจ้างเข้ามา
+from hiring import render_hiring_page
 from offer import render_purchase_page
+from space_4color import render_space_4color_page  # 👈 เปลี่ยนมาเรียกฟังก์ชันหน้าหลัก
 
 st.set_page_config(
     page_title="ระบบสร้างเอกสารพัสดุอัตโนมัติโดยวิธีเฉพาะเจาะจง",
@@ -52,6 +54,13 @@ if st.session_state.page == "home":
         ):
             st.session_state.page = "purchase"
             st.rerun()
+        if st.button(
+            "🎨 เฉพาะเอกสารสี่สี และ รายละเอียดคุณลักษณะ",
+            use_container_width=True,
+            type="secondary",
+        ):
+            st.session_state.page = "space_4color"  # 👈 เปลี่ยนเป็นเปิดหน้าใหม่
+            st.rerun()
 
     with col2:
         if st.button("🛠️ จัดจ้าง (จ้างทำของ/จ้างซ่อม)", use_container_width=True):
@@ -64,4 +73,8 @@ elif st.session_state.page == "purchase":
 
 # --- หน้าจัดจ้าง ---
 elif st.session_state.page == "hiring":
-    render_hiring_page()  # 👈 เรียกใช้งานระบบจัดจ้าง
+    render_hiring_page()
+
+# --- หน้าเอกสารสี่สีและสเปคแบบอิสระ ---
+elif st.session_state.page == "space_4color":
+    render_space_4color_page()
