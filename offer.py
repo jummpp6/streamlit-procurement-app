@@ -891,7 +891,7 @@ def render_purchase_page():
         col_fc1, col_fc2 = st.columns([2, 1], gap="medium")
         with col_fc1:
             st.markdown(
-                "**จัดการข้อมูลรายการสินค้าสำหรับออกเอกสารแนบ Space และ Fourcolor**"
+                "**จัดการข้อมูลรายการสินค้าสำหรับออกเอกสารสี่สีและรายละเอียดคุณลักษณะ**"
             )
 
         with col_fc2:
