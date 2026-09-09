@@ -1,5 +1,5 @@
 # ชื่อไฟล์: space_4color.py
-import os  # 🟢 เพิ่มบรรทัดนี้ที่ด้านบนสุดของไฟล์
+import os
 import pandas as pd
 import streamlit as st
 
@@ -8,35 +8,22 @@ from space import generate_space_excel, get_only_teacher_names
 
 
 def render_space_4color_page():
-    # 🟢 เพิ่มการตรวจสอบและกำหนดค่าเริ่มต้น (Initialization) ป้องกัน Error
-    if "sf_initial_df" not in st.session_state:
-        st.session_state.sf_initial_df = pd.DataFrame([
-            {"name": "", "quantity": 1.0, "unit": "รายการ", "price_per_unit": 0.0}
-        ])
-    if "sf_data_editor_initialized" not in st.session_state:
-        st.session_state.sf_data_editor_initialized = True
-        
-    if "sc_items_df" not in st.session_state:
-        st.session_state.sc_items_df = pd.DataFrame([
-            {"name": "", "quantity": 1.0, "unit": "รายการ", "price_per_unit": 0.0}
-        ])
-
+    # ปุ่มกลับหน้าหลัก
     if st.button("⬅️ กลับหน้าหลัก", use_container_width=False):
         st.session_state.page = "home"
         st.rerun()
 
     st.title("🎨 ระบบสร้างเอกสารสี่สี และ รายละเอียดคุณลักษณะ")
-    st.write("กรอกข้อมูลโครงการ รายการสินค้า และผู้รับพัสดุเพื่อสร้างเอกสารสี่สีและ Space พร้อมกันได้ทันที")
+    st.write(
+        "กรอกข้อมูลโครงการ รายการสินค้า และผู้รับพัสดุเพื่อสร้างเอกสารสี่สีและ Space พร้อมกันได้ทันที"
+    )
     st.markdown("---")
-
-    # โค้ดส่วนที่เหลือของฟังก์ชัน...
 
     # --- ส่วนที่ 1: ข้อมูลโครงการและพัสดุ ---
     st.subheader("📝 1. ข้อมูลโครงการและพัสดุ")
     col1, col2 = st.columns(2, gap="large")
 
     with col1:
-        # ย้ายข้อมูลทั่วไป (ชื่อโครงการ, แผนก, เลขพัสดุ) มาไว้ Col 1 ทั้งหมด
         project_name = st.text_input(
             "ชื่อโครงการ",
             placeholder="ตัวอย่าง: จัดซื้อวัสดุฝึกปฏิบัติการช่างยนต์",
@@ -54,7 +41,6 @@ def render_space_4color_page():
         )
 
     with col2:
-        # ย้ายแหล่งเงินงบประมาณ (st.radio) และเงื่อนไขย่อยมาไว้ Col 2 ทั้งหมด
         budget_source_type = st.radio(
             "แหล่งเงินงบประมาณ",
             [
@@ -122,9 +108,9 @@ def render_space_4color_page():
     st.subheader("📋 3. รายการสินค้า")
     st.write("กรอกรายการสินค้า จำนวน และราคาต่อหน่วยตามต้องการ")
 
-    # กำหนดค่าเริ่มต้นตารางสินค้าว่างๆ สำหรับกรอกเอง
-    if "sc_items_df" not in st.session_state:
-        st.session_state.sc_items_df = pd.DataFrame(
+    # กำหนดค่าเริ่มต้นตารางสินค้า (ใช้ชื่อ sf_initial_df ให้ตรงกันทั้งระบบ)
+    if "sf_initial_df" not in st.session_state:
+        st.session_state.sf_initial_df = pd.DataFrame(
             [{"name": "", "quantity": 1.0, "unit": "รายการ", "price_per_unit": 0.0}]
         )
 
@@ -139,7 +125,7 @@ def render_space_4color_page():
             "quantity": st.column_config.NumberColumn(
                 "จำนวน",
                 min_value=0.0,
-                step=0.01,  # รองรับทศนิยม
+                step=0.01,
                 format="%g",
                 default=1.0,
                 required=True,
@@ -150,7 +136,7 @@ def render_space_4color_page():
             "price_per_unit": st.column_config.NumberColumn(
                 "ราคาต่อหน่วย (บาท)",
                 min_value=0.0,
-                step=0.01,  # รองรับทศนิยมสตางค์
+                step=0.01,
                 format="%.2f",
                 default=0.0,
                 required=True,
@@ -201,7 +187,7 @@ def render_space_4color_page():
     st.markdown("---")
     st.subheader("📥 4. ดาวน์โหลดเอกสาร")
 
-    _template = (
+    space_template = (
         "space.xlsx"
         if os.path.exists("space.xlsx")
         else os.path.join("templates_4color", "space.xlsx")
