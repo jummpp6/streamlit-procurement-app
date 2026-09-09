@@ -1,5 +1,5 @@
 # ชื่อไฟล์: space_4color.py
-import os
+import os  # 🟢 เพิ่มบรรทัดนี้ที่ด้านบนสุดของไฟล์
 import pandas as pd
 import streamlit as st
 
