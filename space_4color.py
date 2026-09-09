@@ -15,7 +15,7 @@ def render_space_4color_page():
 
     st.title("🎨 ระบบสร้างเอกสารสี่สี และ รายละเอียดคุณลักษณะ")
     st.write(
-        "กรอกข้อมูลโครงการ รายการสินค้า และผู้รับพัสดุเพื่อสร้างเอกสารสี่สีและ Space พร้อมกันได้ทันที"
+        "กรอกข้อมูลโครงการ รายการสินค้า และผู้รับพัสดุเพื่อสร้างเอกสารสี่สีและรายละเอียดคุณลักษณะพร้อมกันได้ทันที"
     )
     st.markdown("---")
 
@@ -189,7 +189,7 @@ def render_space_4color_page():
     st.markdown("---")
     st.subheader("📥 4. ดาวน์โหลดเอกสาร")
 
-    space_template = (
+    _template = (
         "space.xlsx"
         if os.path.exists("space.xlsx")
         else os.path.join("templates_4color", "space.xlsx")
