@@ -7,7 +7,7 @@ from fourcolor import generate_fourcolor_excel
 from space import generate_space_excel, get_only_teacher_names
 
 
-def render_space_4color_page():
+def render_space_fourcolor_page():
     # ปุ่มกลับหน้าหลัก
     if st.button("⬅️ กลับหน้าหลัก", use_container_width=False):
         st.session_state.page = "home"
