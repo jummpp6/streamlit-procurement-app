@@ -69,6 +69,15 @@ def get_only_teacher_names(file_path: str = "Teachers") -> list[str]:
     return default_names
 
 
+def get_clean_qty(qty):
+    """แปลงจำนวนให้เป็นตัวเลขจำนวนเต็มถ้าไม่มีเศษ เพื่อความสวยงามในตาราง"""
+    try:
+        f = float(qty)
+        return int(f) if f.is_integer() else f
+    except Exception:
+        return qty
+
+
 def generate_fourcolor_excel(
     template_path,
     receiver,
@@ -158,10 +167,11 @@ def generate_fourcolor_excel(
 
             current_row = start_row
             for idx, item in valid_items.reset_index(drop=True).iterrows():
+                item_qty = get_clean_qty(item["quantity"])
                 if is_space_sheet:
                     ws.cell(row=current_row, column=1, value=idx + 1)
                     ws.cell(row=current_row, column=2, value=item["name"])
-                    ws.cell(row=current_row, column=3, value=item["quantity"])
+                    ws.cell(row=current_row, column=3, value=item_qty)
                     ws.cell(row=current_row, column=4, value=item["unit"])
 
                     for col in range(1, 5):
@@ -189,7 +199,7 @@ def generate_fourcolor_excel(
                     )
                     ws.cell(row=current_row, column=1, value=idx + 1)
                     ws.cell(row=current_row, column=2, value=item["name"])
-                    ws.cell(row=current_row, column=5, value=item["quantity"])
+                    ws.cell(row=current_row, column=5, value=item_qty)
                     ws.cell(row=current_row, column=7, value=item["unit"])
 
                     for col in range(1, 9):
@@ -371,8 +381,7 @@ def render_fourcolor_dialog(
             "quantity": st.column_config.NumberColumn(
                 "จำนวน",
                 min_value=0.0,
-                step=0.01,         # รองรับทศนิยม
-                format="%g",
+                step=1.0,
                 default=1.0,
                 required=True,
             ),
@@ -384,7 +393,7 @@ def render_fourcolor_dialog(
             "price_per_unit": st.column_config.NumberColumn(
                 "ราคาต่อหน่วย (บาท)",
                 min_value=0.0,
-                step=0.01,         # รองรับทศนิยมสตางค์
+                step=10.0,
                 format="%.2f",
                 default=0.0,
                 required=True,
