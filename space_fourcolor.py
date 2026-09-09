@@ -110,12 +110,7 @@ def render_space_fourcolor_dialog(
         column_config={
             "name": st.column_config.Column("รายการ", width="large", required=True),
             "quantity": st.column_config.NumberColumn(
-                "จำนวน", 
-                min_value=0.0, 
-                step=0.01,         # รองรับทศนิยม
-                format="%g", 
-                default=1.0, 
-                required=True
+                "จำนวน", min_value=0.0, step=1.0, default=1.0, required=True
             ),
             "unit": st.column_config.TextColumn(
                 "หน่วยนับ", default="รายการ", required=True
@@ -123,7 +118,7 @@ def render_space_fourcolor_dialog(
             "price_per_unit": st.column_config.NumberColumn(
                 "ราคาต่อหน่วย (บาท)",
                 min_value=0.0,
-                step=0.01,         # รองรับทศนิยมสตางค์
+                step=1.0,
                 format="%.2f",
                 default=0.0,
                 required=True,
@@ -199,7 +194,6 @@ def render_space_fourcolor_dialog(
         )
 
         if os.path.exists(space_template) and os.path.exists(fourcolor_template):
-            # สร้างไฟล์ Excel ทั้งสองแบบเตรียมไว้ทันทีจากตารางเดียวกัน
             fourcolor_bytes = generate_fourcolor_excel(
                 fourcolor_template,
                 receiver,
@@ -232,7 +226,6 @@ def render_space_fourcolor_dialog(
                     help="ราคารวมในตารางต้องเท่ากับราคารวมของร้านค้าจึงจะดาวน์โหลดได้",
                 )
             else:
-                # แสดงปุ่มดาวน์โหลดทั้ง 2 ไฟล์เคียงข้างกัน กดแยกอันไหนก็ได้จากข้อมูลชุดเดียวกัน
                 dl_col1, dl_col2 = st.columns(2)
                 with dl_col1:
                     st.download_button(
