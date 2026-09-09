@@ -802,7 +802,7 @@ def render_hiring_page():
             "รายการพัสดุ / รายละเอียดสเปค": st.column_config.TextColumn(
                 "รายการพัสดุ / รายละเอียดสเปค / ขอบเขตงาน", width="large"
             ),
-            "จำนวน": st.column_config.NumberColumn("จำนวน", width="small", format="%d"),
+            "จำนวน": st.column_config.NumberColumn("จำนวน", width="small", format="%.2f"),
             "หน่วย": st.column_config.TextColumn("หน่วย", width="small"),
         },
     )
